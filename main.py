@@ -48,41 +48,16 @@ app.mount("/static", StaticFiles(directory="."), name="static")
 
 
 # PDFKit setup - CLOUD COMPATIBLE
+# PDFKit setup - CLOUD COMPATIBLE
 def setup_pdfkit():
     """Setup pdfkit configuration for cloud deployment."""
     try:
-        possible_paths = [
-            "./bin/wkhtmltopdf/bin/wkhtmltopdf.exe",  # Local development
-            "./bin/wkhtmltopdf/wkhtmltopdf.exe",  # Alternative local path
-            "/app/bin/wkhtmltopdf/bin/wkhtmltopdf.exe",  # Railway path
-            "wkhtmltopdf"  # System PATH
-        ]
-
-        # Add Windows paths for local development
-        possible_paths.extend([
-            r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe",
-            r"C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe",
-        ])
-
-        wkhtmltopdf_path = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                wkhtmltopdf_path = path
-                logger.info(f"Found wkhtmltopdf at: {path}")
-                break
-
-        if wkhtmltopdf_path:
-            config = pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
-            return config
-        else:
-            logger.warning("wkhtmltopdf not found. PDF generation will be disabled.")
-            return None
+        # Since we don't have wkhtmltopdf binaries in cloud, return None
+        logger.warning("PDF generation disabled - wkhtmltopdf not available in cloud")
+        return None
     except Exception as e:
         logger.warning(f"Could not configure pdfkit: {e}")
         return None
-
-
-pdfkit_config = setup_pdfkit()
 
 def pil_to_base64_png(im: Image.Image) -> str:
     """Convert PIL Image to base64 PNG string."""
@@ -1104,4 +1079,5 @@ async def generate_practice_pdf(request: Request):
         }, status_code=500)
 
 if __name__ == "__main__":
+
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
