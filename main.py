@@ -16,9 +16,6 @@ import logging
 from datetime import datetime
 import re
 from fastapi import Request
-import pdfkit
-from jinja2 import Template
-import tempfile
 
 # Configure Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -47,14 +44,8 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="."), name="static")
 
 # PDFKit configuration - DISABLED FOR CLOUD
-pdfkit_config = None
 
-def setup_pdfkit():
-    """PDFKit setup - disabled for cloud deployment"""
-    logger.warning("PDF generation disabled - wkhtmltopdf not available in cloud")
-    return None
 
-pdfkit_config = setup_pdfkit()
 
 def pil_to_base64_png(im: Image.Image) -> str:
     """Convert PIL Image to base64 PNG string."""
@@ -289,27 +280,6 @@ async def create_practice_paper(request: dict):
             "error": f"Practice paper creation failed: {str(e)}"
         }, status_code=500)
 
-# PDF endpoints - return simple messages since PDF generation is disabled
-@app.post("/generate-performance-pdf")
-async def generate_performance_pdf():
-    return JSONResponse({
-        "success": False,
-        "error": "PDF generation is currently disabled in cloud deployment"
-    })
-
-@app.post("/generate-detailed-pdf")
-async def generate_detailed_pdf():
-    return JSONResponse({
-        "success": False,
-        "error": "PDF generation is currently disabled in cloud deployment"
-    })
-
-@app.post("/generate-practice-pdf")
-async def generate_practice_pdf():
-    return JSONResponse({
-        "success": False,
-        "error": "PDF generation is currently disabled in cloud deployment"
-    })
 
 # Health check endpoint
 @app.get("/health")
@@ -319,4 +289,5 @@ async def health_check():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+
 
