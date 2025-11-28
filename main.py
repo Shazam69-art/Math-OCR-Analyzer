@@ -20,10 +20,11 @@ import pdfkit
 from jinja2 import Template
 import tempfile
 
-# Configure Gemini - SECURE VERSION
+# Configure Gemini - TEMPORARY FIX
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY environment variable is required")
+    # Temporary: Use direct key for testing
+    GEMINI_API_KEY = "AIzaSyCnWDsYjgpqDmujB4xNS5-kW5ClvBv_Hcc"
 
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.5-flash")
@@ -1081,3 +1082,4 @@ async def generate_practice_pdf(request: Request):
 if __name__ == "__main__":
 
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+
