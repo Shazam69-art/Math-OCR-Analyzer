@@ -912,9 +912,99 @@
             return formatted;
         }
 
+        // PDF Downloads
+        document.getElementById('downloadPerformancePdf').onclick = async () => {
+            try {
+                const fd = new FormData();
+                fd.append('analysis_data', JSON.stringify({
+                    analysis: analysisData,
+                    type: 'performance'
+                }));
+                const response = await fetch('/generate-performance-pdf', {
+                    method: 'POST',
+                    body: fd
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'Math_Performance_Report.pdf';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    alert('Failed to download PDF');
+                }
+            } catch (e) {
+                alert('Error downloading PDF: ' + e.message);
+            }
+        };
+
+        document.getElementById('downloadDetailedPdf').onclick = async () => {
+            try {
+                const fd = new FormData();
+                fd.append('analysis_data', JSON.stringify({
+                    analysis: analysisData,
+                    detailed_data: detailedData,
+                    type: 'detailed'
+                }));
+                const response = await fetch('/generate-detailed-pdf', {
+                    method: 'POST',
+                    body: fd
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'Detailed_Analysis_Report.pdf';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    alert('Failed to download PDF');
+                }
+            } catch (e) {
+                alert('Error downloading PDF: ' + e.message);
+            }
+        };
+
+        document.getElementById('downloadPracticePdf').onclick = async () => {
+            if (!practicePaperData) {
+                alert('Generate practice paper first');
+                return;
+            }
+            
+            try {
+                const fd = new FormData();
+                fd.append('practice_paper', JSON.stringify({
+                    content: practicePaperData,
+                    type: 'practice'
+                }));
+                const response = await fetch('/generate-practice-pdf', {
+                    method: 'POST',
+                    body: fd
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'Targeted_Practice_Paper.pdf';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    alert('Failed to download PDF');
+                }
+                } catch (e) {
+                alert('Error downloading PDF: ' + e.message);
+            }
+        };
+
         // Initialize
         showMainInterface();
     </script>
 </body>
-
 </html>
