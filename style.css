@@ -804,3 +804,37 @@ body {
     border-left: 4px solid #28a745;
     display: none;
 }
+.success-text {
+    background: #ecfdf5;
+    color: #059669;
+    padding: 16px;
+    border-radius: 8px;
+    border-left: 4px solid #10b981;
+    font-weight: 500;
+}
+
+.mistake-item {
+    background: #fef2f2;
+    color: #991b1b;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    border-left: 4px solid #ef4444;
+    border-radius: 0 8px 8px 0;
+    line-height: 1.6;
+}
+
+.math-content {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    padding: 16px;
+    background: #fafafa;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin: 8px 0;
+    font-size: 1.05rem;
+    line-height: 1.8;
+}
+
+.accordion-content.open {
+    padding: 28px;
+}
