@@ -466,7 +466,7 @@
         };
     </script>
 
-    <script>
+ <script>
         // State
         let questionFiles = [];
         let answerFiles = [];
@@ -503,12 +503,17 @@
 
         // Upload files
         async function uploadFiles(files, type) {
-            if (!files.length) return;
+            if (!files.length) {
+                showError('Please select at least one file');
+                return;
+            }
 
             const formData = new FormData();
             files.forEach(file => formData.append('files', file));
 
             try {
+                showLoading(`${type === 'question' ? 'Question' : 'Answer'} files uploading...`);
+                
                 const response = await fetch(`/upload-${type}`, {
                     method: 'POST',
                     body: formData
@@ -533,8 +538,24 @@
                     showError(data.error || 'Upload failed');
                 }
             } catch (error) {
+                console.error('Upload error:', error);
                 showError('Upload failed: ' + error.message);
+            } finally {
+                hideLoading();
             }
+        }
+
+        // Show loading
+        function showLoading(message = 'Processing...') {
+            loading.style.display = 'block';
+            if (message) {
+                loading.querySelector('p').textContent = message;
+            }
+        }
+
+        // Hide loading
+        function hideLoading() {
+            loading.style.display = 'none';
         }
 
         // Check if analyze button should be enabled
@@ -569,11 +590,12 @@
                 return;
             }
 
-            loading.style.display = 'block';
+            showLoading('Analyzing your work...');
             resultsSection.style.display = 'none';
             errorMessage.style.display = 'none';
 
             try {
+                // Call the CORRECT endpoint: /analyze (not /analyze-chat)
                 const response = await fetch('/analyze', {
                     method: 'POST',
                     headers: {
@@ -591,9 +613,10 @@
                     showError(data.error || 'Analysis failed');
                 }
             } catch (error) {
+                console.error('Analysis error:', error);
                 showError('Analysis failed: ' + error.message);
             } finally {
-                loading.style.display = 'none';
+                hideLoading();
             }
         }
 
@@ -623,7 +646,7 @@
             accordion.className = 'question-accordion';
             accordion.innerHTML = `
                 <div class="accordion-header" onclick="toggleAccordion(${index})">
-                    <span>${question.id} - ${question.question_text.substring(0, 50)}${question.question_text.length > 50 ? '...' : ''}</span>
+                    <span>${question.id} - ${question.question_text ? question.question_text.substring(0, 50) : 'Question'}${question.question_text && question.question_text.length > 50 ? '...' : ''}</span>
                     <span class="status-badge ${question.is_correct ? 'correct' : 'incorrect'}">
                         ${question.is_correct ? '✓ Correct' : '✗ Needs Review'}
                     </span>
@@ -636,7 +659,7 @@
                             Question
                         </div>
                         <div class="math-content" id="question-${index}">
-                            ${escapeHtml(question.question_text) || 'No question text'}
+                            ${formatMathContent(question.question_text) || 'No question text'}
                         </div>
                     </div>
 
@@ -647,7 +670,7 @@
                             Student's Answer (Exact)
                         </div>
                         <div class="math-content" id="student-${index}">
-                            ${escapeHtml(question.student_answer) || 'No answer provided'}
+                            ${formatMathContent(question.student_answer) || 'No answer provided'}
                         </div>
                     </div>
 
@@ -657,7 +680,7 @@
                             <span class="section-icon">🔍</span>
                             Mistakes Found
                         </div>
-                        ${question.mistakes.length > 0 ? 
+                        ${question.mistakes && question.mistakes.length > 0 ? 
                             `<ul class="mistakes-list">
                                 ${question.mistakes.map(mistake => `
                                     <li class="mistake-item">${escapeHtml(mistake)}</li>
@@ -674,7 +697,7 @@
                             Corrected Solution
                         </div>
                         <div class="math-content" id="corrected-${index}">
-                            ${escapeHtml(question.corrected_solution) || 'No corrected solution'}
+                            ${formatMathContent(question.corrected_solution) || 'No corrected solution'}
                         </div>
                     </div>
 
@@ -687,7 +710,7 @@
                         <p>If you think the analysis is incorrect, provide feedback below:</p>
                         <textarea class="feedback-input" id="feedback-${index}" 
                                   placeholder="Describe what you think is wrong with the analysis..."></textarea>
-                        <button class="reanalyze-btn" onclick="reanalyzeQuestion(${index})">
+                        <button class="reanalyze-btn" onclick="reanalyzeQuestion(${index}, '${question.id}')">
                             <span>🔄</span>
                             <span>Reanalyze</span>
                         </button>
@@ -699,7 +722,7 @@
         }
 
         // Toggle accordion
-        function toggleAccordion(index) {
+        window.toggleAccordion = function(index) {
             const content = document.getElementById(`content-${index}`);
             content.classList.toggle('open');
             
@@ -709,10 +732,10 @@
                     MathJax.typesetPromise([content]);
                 }, 50);
             }
-        }
+        };
 
         // Reanalyze question
-        async function reanalyzeQuestion(index) {
+        window.reanalyzeQuestion = async function(index, questionId) {
             const question = analysisData[index];
             const feedback = document.getElementById(`feedback-${index}`).value.trim();
             
@@ -721,6 +744,8 @@
                 return;
             }
 
+            showLoading('Reanalyzing question...');
+
             try {
                 const response = await fetch('/reanalyze-question', {
                     method: 'POST',
@@ -728,7 +753,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        question_id: question.id,
+                        question_id: questionId,
                         feedback: feedback,
                         original_question: question
                     })
@@ -744,12 +769,34 @@
 
                     // Update the UI
                     const contentDiv = document.getElementById(`content-${index}`);
-                    contentDiv.querySelector('.mistakes-list').innerHTML = 
-                        question.mistakes.map(m => `<li class="mistake-item">${escapeHtml(m)}</li>`).join('');
                     
+                    // Update mistakes
+                    const mistakesSection = contentDiv.querySelector('.mistakes-list');
+                    if (mistakesSection) {
+                        mistakesSection.innerHTML = 
+                            question.mistakes.map(m => `<li class="mistake-item">${escapeHtml(m)}</li>`).join('');
+                    } else {
+                        // Create mistakes list if it doesn't exist
+                        const section = contentDiv.querySelectorAll('.analysis-section')[2];
+                        section.innerHTML = `
+                            <div class="section-title">
+                                <span class="section-icon">🔍</span>
+                                Mistakes Found
+                            </div>
+                            ${question.mistakes.length > 0 ? 
+                                `<ul class="mistakes-list">
+                                    ${question.mistakes.map(m => `<li class="mistake-item">${escapeHtml(m)}</li>`).join('')}
+                                </ul>` :
+                                `<div class="math-content">No mistakes found</div>`
+                            }
+                        `;
+                    }
+                    
+                    // Update corrected solution
                     document.getElementById(`corrected-${index}`).innerHTML = 
-                        escapeHtml(question.corrected_solution);
+                        formatMathContent(question.corrected_solution);
                     
+                    // Update status badge
                     const badge = contentDiv.parentElement.querySelector('.status-badge');
                     badge.className = `status-badge ${question.is_correct ? 'correct' : 'incorrect'}`;
                     badge.textContent = question.is_correct ? '✓ Correct' : '✗ Needs Review';
@@ -769,8 +816,25 @@
                     showError(data.error || 'Reanalysis failed');
                 }
             } catch (error) {
+                console.error('Reanalysis error:', error);
                 showError('Reanalysis failed: ' + error.message);
+            } finally {
+                hideLoading();
             }
+        };
+
+        // Format math content for MathJax
+        function formatMathContent(text) {
+            if (!text) return '';
+            
+            // Preserve line breaks
+            let formatted = escapeHtml(text).replace(/\n/g, '<br>');
+            
+            // Ensure MathJax delimiters are preserved
+            formatted = formatted.replace(/\\\[/g, '\\[').replace(/\\\]/g, '\\]');
+            formatted = formatted.replace(/\\\(/g, '\\(').replace(/\\\)/g, '\\)');
+            
+            return formatted;
         }
 
         // Helper function to escape HTML
@@ -783,6 +847,6 @@
 
         // Initialize
         checkAnalyzeButton();
-    </script>
-</body>
+    </script></body>
 </html>
+
