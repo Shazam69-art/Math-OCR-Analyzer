@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Math Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+            },
+            startup: {
+                pageReady: () => {
+                    return MathJax.startup.defaultPageReady().then(() => {
+                        console.log('MathJax initialized');
+                    });
+                }
+            }
+        };
+    </script>
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="loginPage" class="page active">
+        <div class="login-container">
+            <div class="login-header">
+                <h1>Math Analyzer</h1>
+                <p>Sign in to analyze your math work</p>
+            </div>
+            <div class="login-box">
+                <h2>Welcome Back</h2>
+                <p class="login-subtitle">Sign in to your account</p>
+                <div class="social-login">
+                    <button class="social-btn google-btn">
+                        <span>🔍</span> Continue with Google
+                    </button>
+                    <button class="social-btn apple-btn">
+                        <span>🍎</span> Continue with Apple
+                    </button>
+                </div>
+                <div class="divider"><span>or</span></div>
+                <form class="login-form" id="loginForm">
+                    <div class="form-group">
+                        <label for="username">Email or Username</label>
+                        <input type="text" id="username" placeholder="Enter your email or username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" placeholder="Enter your password" required>
+                    </div>
+                    <div class="form-options">
+                        <label class="remember-me">
+                            <input type="checkbox"> Remember me
+                        </label>
+                        <a href="#" class="forgot-password">Forgot password?</a>
+                    </div>
+                    <button type="submit" class="login-btn">Sign In</button>
+                </form>
+                <div class="signup-link">
+                    Don't have an account? <a href="#">Sign up</a>
+                </div>
+            </div>
+            <div class="login-footer">
+                © 2025 Math Analyzer. All rights reserved.
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboardPage" class="page">
+        <div class="dashboard-container">
+            <div class="dashboard-header">
+                <div class="header-left">
+                    <h1 id="userNameDisplay">Welcome</h1>
+                    <p>Analyze your math problems</p>
+                </div>
+                <div class="user-menu">
+                    <div class="user-info">
+                        <span class="user-name" id="userName">User</span>
+                        <span class="user-role">Student</span>
+                    </div>
+                    <div class="user-avatar" id="userAvatar">U</div>
+                    <button class="logout-btn" id="logoutBtn">🚪</button>
+                </div>
+            </div>
+
+            <!-- Main Buttons -->
+            <div class="action-buttons">
+                <button class="action-btn detailed-btn" id="uploadQuestionBtn">Upload Question</button>
+                <input type="file" id="questionInput" multiple accept=".jpg,.jpeg,.png" style="display: none;">
+                <button class="action-btn detailed-btn" id="uploadAnswerBtn">Upload Answer</button>
+                <input type="file" id="answerInput" multiple accept=".jpg,.jpeg,.png" style="display: none;">
+                <select class="analysis-select" id="analysisSheetSelect">
+                    <option value="">Select Analysis Sheet</option>
+                    <option value="math12">Math 12 – Integration Substitution and Basic Questions of Special Formulas</option>
+                </select>
+                <button class="action-btn generate-btn" id="detailAnalysisBtn">Detail Analysis</button>
+                <button class="action-btn generate-btn" id="generatePaperBtn">Generate Question Paper</button>
+            </div>
+
+            <!-- Progress Section -->
+            <div class="progress-card" id="progressSection" style="display: none;">
+                <h3>Analysis Progress</h3>
+                <p id="progress-text">Analyzing your work... This may take a moment.</p>
+                <div class="spinner"></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-details" id="progressDetails"></div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <div class="results-header">
+                    <h2>Analysis Results</h2>
+                    <div class="result-stats" id="totalQuestions">0 questions analyzed</div>
+                </div>
+                <div id="questionsContainer"></div>
+            </div>
+
+            <!-- Generated Paper Section -->
+            <div class="results-section" id="generatedPaperSection" style="display: none;">
+                <div class="results-header">
+                    <h2>Generated Question Paper</h2>
+                </div>
+                <div id="generatedQuestionsContainer"></div>
+            </div>
+
+            <!-- Error and Success Messages -->
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let questionFiles = [];
+        let answerFiles = [];
+        let analysisData = null;
+        let generatedPaper = null;
+
+        // DOM Elements
+        const loginPage = document.getElementById('loginPage');
+        const dashboardPage = document.getElementById('dashboardPage');
+        const loginForm = document.getElementById('loginForm');
+        const usernameInput = document.getElementById('username');
+        const userNameDisplay = document.getElementById('userNameDisplay');
+        const userName = document.getElementById('userName');
+        const userAvatar = document.getElementById('userAvatar');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const questionInput = document.getElementById('questionInput');
+        const answerInput = document.getElementById('answerInput');
+        const uploadQuestionBtn = document.getElementById('uploadQuestionBtn');
+        const uploadAnswerBtn = document.getElementById('uploadAnswerBtn');
+        const analysisSheetSelect = document.getElementById('analysisSheetSelect');
+        const detailAnalysisBtn = document.getElementById('detailAnalysisBtn');
+        const generatePaperBtn = document.getElementById('generatePaperBtn');
+        const progressSection = document.getElementById('progressSection');
+        const progressText = document.getElementById('progress-text');
+        const progressFill = document.getElementById('progressFill');
+        const progressDetails = document.getElementById('progressDetails');
+        const resultsSection = document.getElementById('resultsSection');
+        const questionsContainer = document.getElementById('questionsContainer');
+        const totalQuestions = document.getElementById('totalQuestions');
+        const generatedPaperSection = document.getElementById('generatedPaperSection');
+        const generatedQuestionsContainer = document.getElementById('generatedQuestionsContainer');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+
+        // Check if logged in
+        if (localStorage.getItem('userName')) {
+            showDashboard();
+        }
+
+        // Login Handler
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = usernameInput.value.trim();
+            if (username) {
+                const userPart = username.split('@')[0];
+                localStorage.setItem('userName', userPart);
+                showDashboard();
+            }
+        });
+
+        // Show Dashboard
+        function showDashboard() {
+            const name = localStorage.getItem('userName');
+            userNameDisplay.textContent = `Welcome, ${name}`;
+            userName.textContent = name;
+            userAvatar.textContent = name[0].toUpperCase();
+            loginPage.classList.remove('active');
+            dashboardPage.classList.add('active');
+        }
+
+        // Logout
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('userName');
+            dashboardPage.classList.remove('active');
+            loginPage.classList.add('active');
+        });
+
+        // Upload Buttons
+        uploadQuestionBtn.addEventListener('click', () => questionInput.click());
+        uploadAnswerBtn.addEventListener('click', () => answerInput.click());
+
+        questionInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            await uploadFiles(files, 'question');
+        });
+
+        answerInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            await uploadFiles(files, 'answer');
+        });
+
+        // Upload Files
+        async function uploadFiles(files, type) {
+            if (!files.length) {
+                showError('Please select at least one file');
+                return;
+            }
+            const formData = new FormData();
+            files.forEach(file => formData.append('files', file));
+            try {
+                const response = await fetch(`/upload-${type}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (data.success) {
+                    if (type === 'question') {
+                        questionFiles = files;
+                        showSuccess('Questions uploaded successfully');
+                    } else {
+                        answerFiles = files;
+                        showSuccess('Answers uploaded successfully');
+                    }
+                } else {
+                    showError(data.error || 'Upload failed');
+                }
+            } catch (error) {
+                showError('Upload failed: ' + error.message);
+            }
+        }
+
+        // Analysis Sheet Select
+        analysisSheetSelect.addEventListener('change', (e) => {
+            if (e.target.value) {
+                analyzeAnswers();
+            }
+        });
+
+        // Detail Analysis Button
+        detailAnalysisBtn.addEventListener('click', () => {
+            if (analysisData) {
+                resultsSection.style.display = 'block';
+            } else {
+                showError('Please perform analysis first');
+            }
+        });
+
+        // Generate Paper Button
+        generatePaperBtn.addEventListener('click', async () => {
+            if (!analysisData) {
+                showError('Please perform analysis first');
+                return;
+            }
+            try {
+                progressSection.style.display = 'block';
+                progressText.textContent = 'Generating question paper...';
+                const response = await fetch('/generate-paper');
+                const data = await response.json();
+                if (data.success) {
+                    generatedPaper = data.questions;
+                    displayGeneratedPaper(generatedPaper);
+                    showSuccess('Question paper generated');
+                } else {
+                    showError(data.error || 'Generation failed');
+                }
+            } catch (error) {
+                showError('Generation failed: ' + error.message);
+            } finally {
+                progressSection.style.display = 'none';
+            }
+        });
+
+        // Analyze Answers with Streaming
+        async function analyzeAnswers() {
+            if (!questionFiles.length || !answerFiles.length) {
+                showError('Please upload both questions and answers');
+                return;
+            }
+            progressSection.style.display = 'block';
+            progressText.textContent = 'Analyzing your work... This may take a moment.';
+            progressDetails.innerHTML = '';
+            progressFill.style.width = '0%';
+            resultsSection.style.display = 'none';
+            errorMessage.style.display = 'none';
+            let fullText = '';
+            try {
+                const response = await fetch('/analyze', { method: 'POST' });
+                if (!response.body) throw new Error('No response body');
+                const reader = response.body.getReader();
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = new TextDecoder().decode(value);
+                    fullText += chunk;
+                    // Simulate progress without showing raw chunks
+                    const currentWidth = parseFloat(progressFill.style.width) || 0;
+                    progressFill.style.width = `${Math.min(currentWidth + 5, 95)}%`; // Up to 95% until done
+                }
+                const questions = parseGeminiResponse(fullText);
+                analysisData = questions;
+                displayResults(questions);
+                showSuccess('Analysis complete!');
+                progressFill.style.width = '100%';
+            } catch (error) {
+                showError('Analysis failed: ' + error.message);
+            } finally {
+                setTimeout(() => {
+                    progressSection.style.display = 'none';
+                }, 1000); // Hide after short delay
+            }
+        }
+
+        // Parse Gemini Response (Client-side)
+        function parseGeminiResponse(text) {
+            const questions = [];
+            const sections = text.split("---");
+            sections.forEach(section => {
+                section = section.trim();
+                if (!section || !section.includes("QUESTION")) return;
+                const lines = section.split("\n");
+                const question_data = {
+                    id: "",
+                    question_text: "",
+                    student_answer: "",
+                    mistakes: [],
+                    corrected_solution: "",
+                    is_correct: false
+                };
+                let current_section = null;
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (line.startsWith("QUESTION")) {
+                        const parts = line.split(":", 2); // Split into 2 parts
+                        question_data.id = parts[0].replace("QUESTION", "").trim();
+                        if (parts.length > 1) question_data.question_text = parts[1].trim();
+                    } else if (line === "STUDENT'S ANSWER:") {
+                        current_section = "student";
+                    } else if (line === "MISTAKES:") {
+                        current_section = "mistakes";
+                    } else if (line === "CORRECTED SOLUTION:") {
+                        current_section = "corrected";
+                    } else if (line.startsWith("MATCH:")) {
+                        question_data.is_correct = line.toUpperCase().includes("YES");
+                    } else if (current_section === "student" && line) {
+                        question_data.student_answer += line + "\n";
+                    } else if (current_section === "mistakes" && line.startsWith("-")) {
+                        const mistake = line.slice(1).trim();
+                        if (mistake && !mistake.toLowerCase().includes("no mistakes")) {
+                            question_data.mistakes.push(mistake);
+                        }
+                    } else if (current_section === "corrected" && line) {
+                        question_data.corrected_solution += line + "\n";
+                    }
+                });
+                // Trim fields
+                ["question_text", "student_answer", "corrected_solution"].forEach(key => {
+                    if (question_data[key]) question_data[key] = question_data[key].trim();
+                });
+                if (!question_data.id) question_data.id = `Q${questions.length + 1}`;
+                questions.push(question_data);
+            });
+            // Fallback if no questions parsed
+            if (questions.length === 0) {
+                questions.push({
+                    id: "Q1",
+                    question_text: "Error parsing analysis",
+                    student_answer: "",
+                    mistakes: ["Analysis parsing failed"],
+                    corrected_solution: "",
+                    is_correct: false
+                });
+            }
+            return questions;
+        }
+
+        // Display Results
+        function displayResults(questions) {
+            questionsContainer.innerHTML = '';
+            totalQuestions.textContent = `${questions.length} question(s) analyzed`;
+            questions.forEach((q, index) => {
+                const accordion = createQuestionAccordion(q, index);
+                questionsContainer.appendChild(accordion);
+            });
+            resultsSection.style.display = 'block';
+            setTimeout(() => {
+                MathJax.typesetPromise([questionsContainer]);
+            }, 100);
+        }
+
+        // Create Question Accordion
+        function createQuestionAccordion(question, index) {
+            const div = document.createElement('div');
+            div.className = 'question-accordion';
+            div.innerHTML = `
+                <div class="accordion-header" onclick="toggleAccordion(${index})">
+                    <span>${question.id}</span>
+                    <span class="status-badge ${question.is_correct ? 'correct' : 'incorrect'}">
+                        ${question.is_correct ? '✓ Correct' : '✗ Needs Review'}
+                    </span>
+                </div>
+                <div class="accordion-content" id="content-${index}">
+                    <div class="analysis-section">
+                        <div class="section-title">Question</div>
+                        <div class="math-content">${question.question_text || 'No question text'}</div>
+                    </div>
+                    <div class="analysis-section">
+                        <div class="section-title">Student's Answer</div>
+                        <div class="math-content">${question.student_answer || 'No answer provided'}</div>
+                    </div>
+                    <div class="analysis-section">
+                        <div class="section-title">Errors</div>
+                        ${question.mistakes.length ? 
+                            `<ul class="mistakes-list">${question.mistakes.map(m => `<li class="mistake-item">${m}</li>`).join('')}</ul>` : 
+                            `<div class="math-content">No errors found</div>`}
+                    </div>
+                    <div class="analysis-section">
+                        <div class="section-title">Corrected Solution</div>
+                        <div class="math-content">${question.corrected_solution || 'No corrected solution'}</div>
+                    </div>
+                </div>
+            `;
+            return div;
+        }
+
+        // Toggle Accordion
+        window.toggleAccordion = function(index) {
+            const content = document.getElementById(`content-${index}`);
+            content.classList.toggle('open');
+            if (content.classList.contains('open')) {
+                MathJax.typesetPromise([content]);
+            }
+        };
+
+        // Display Generated Paper
+        function displayGeneratedPaper(questions) {
+            generatedQuestionsContainer.innerHTML = '';
+            questions.forEach(q => {
+                const div = document.createElement('div');
+                div.className = 'question-item';
+                div.innerHTML = `
+                    <div class="question-header">
+                        <span class="question-number">${q.id}</span>
+                    </div>
+                    <div class="math-content">${q.new_question}</div>
+                `;
+                generatedQuestionsContainer.appendChild(div);
+            });
+            generatedPaperSection.style.display = 'block';
+            setTimeout(() => {
+                MathJax.typesetPromise([generatedQuestionsContainer]);
+            }, 100);
+        }
+
+        // Show Error
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(() => errorMessage.style.display = 'none', 5000);
+        }
+
+        // Show Success
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            setTimeout(() => successMessage.style.display = 'none', 3000);
+        }
+    </script>
+</body>
+</html>
