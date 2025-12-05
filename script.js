@@ -1,58 +1,69 @@
-// User database with roles linked to emails
+// User database
 const userDatabase = {
-    'doctor@mednemesis.com': { 
+    'teacher@math.com': { 
         password: 'password', 
-        name: 'Dr. Jonathan Smith', 
-        role: 'doctor',
-        specialty: 'Cardiologist'
+        name: 'Dr. Mathematics', 
+        role: 'teacher'
     },
-    'patient@mednemesis.com': { 
+    'student@math.com': { 
         password: 'password', 
-        name: 'Sarah Johnson', 
-        role: 'patient',
-        patientId: 'P-7842'
+        name: 'Student Learner', 
+        role: 'student'
     },
-    'nurse@mednemesis.com': { 
+    'admin@math.com': { 
         password: 'password', 
-        name: 'Emily Wilson', 
-        role: 'nurse',
-        department: 'Emergency Care'
-    },
-    'receptionist@mednemesis.com': { 
-        password: 'password', 
-        name: 'Michael Brown', 
-        role: 'receptionist',
-        location: 'Main Reception'
-    },
-    'pharmacist@mednemesis.com': { 
-        password: 'password', 
-        name: 'David Chen', 
-        role: 'pharmacist',
-        pharmacy: 'Central Pharmacy'
+        name: 'Admin User', 
+        role: 'admin'
     }
 };
 
 // Current user state
 let currentUser = null;
+let questionFiles = [];
+let answerFiles = [];
+let analysisResults = null;
 
 // DOM Elements
 const loginPage = document.getElementById('login-page');
-const rolePage = document.getElementById('role-page');
-const dashboardContainer = document.getElementById('dashboard-container');
+const dashboardPage = document.getElementById('dashboard-page');
+const loginForm = document.querySelector('.login-form');
+const userName = document.getElementById('user-name');
+const dashboardUserName = document.getElementById('dashboard-user-name');
+const logoutBtn = document.getElementById('logout-btn');
+const uploadQuestionBtn = document.getElementById('upload-question-btn');
+const uploadAnswerBtn = document.getElementById('upload-answer-btn');
+const questionUpload = document.getElementById('question-upload');
+const answerUpload = document.getElementById('answer-upload');
+const questionFileList = document.getElementById('question-file-list');
+const answerFileList = document.getElementById('answer-file-list');
+const analysisSheet = document.getElementById('analysis-sheet');
+const beginAnalysisBtn = document.getElementById('begin-analysis-btn');
+const progressSection = document.getElementById('progress-section');
+const progressText = document.getElementById('progress-text');
+const progressFill = document.getElementById('progress-fill');
+const progressDetails = document.getElementById('progress-details');
+const resultsSection = document.getElementById('results-section');
+const totalQuestions = document.getElementById('total-questions');
+const detailedAnalysisBtn = document.getElementById('detailed-analysis-btn');
+const generatePaperBtn = document.getElementById('generate-paper-btn');
+const analysisResultsDiv = document.getElementById('analysis-results');
+const generatePaperModal = document.getElementById('generate-paper-modal');
+const closeModal = document.getElementById('close-modal');
+const questionSelectorList = document.getElementById('question-selector-list');
+const previewContent = document.getElementById('preview-content');
+const generateFinalBtn = document.getElementById('generate-final-btn');
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
     // Check if user is already logged in
-    const savedUser = localStorage.getItem('mednemesis_user');
+    const savedUser = localStorage.getItem('math_ocr_user');
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
-        // Directly load their dashboard based on stored role
-        loadDashboard(currentUser.role);
+        loadDashboard();
         return;
     }
 
     // Set up login form
-    const loginForm = document.querySelector('.login-form');
     loginForm.addEventListener('submit', function(e) {
         e.preventDefault();
         handleLogin();
@@ -68,7 +79,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Handle login process
+// Handle login
 function handleLogin() {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
@@ -83,932 +94,417 @@ function handleLogin() {
         currentUser = {
             email: email,
             name: userDatabase[email].name,
-            role: userDatabase[email].role,
-            ...userDatabase[email]
+            role: userDatabase[email].role
         };
         
         // Store user in localStorage
-        localStorage.setItem('mednemesis_user', JSON.stringify(currentUser));
-        
-        // If user already has a role assigned, go directly to dashboard
-        if (currentUser.role) {
-            loadDashboard(currentUser.role);
-        } else {
-            // Show role selection (for new users without assigned roles)
-            showRoleSelection();
-        }
+        localStorage.setItem('math_ocr_user', JSON.stringify(currentUser));
+        loadDashboard();
     } else {
-        alert('Invalid email or password. Try: doctor@mednemesis.com / password');
+        alert('Invalid email or password. Try: teacher@math.com / password');
     }
 }
 
-// Show role selection page
-function showRoleSelection() {
-    // This would be used for new users without assigned roles
-    const roleSelectionHTML = `
-        <div class="role-container">
-            <div class="role-header">
-                <h1>Select Your Role</h1>
-                <p>Choose your primary role in the healthcare system</p>
-            </div>
-            
-            <div class="role-grid">
-                <div class="role-card" data-role="doctor">
-                    <div class="role-icon">
-                        <i class="fas fa-user-md"></i>
-                    </div>
-                    <h3>Doctor</h3>
-                    <p>Access patient records, create prescriptions, and manage appointments</p>
-                </div>
-                
-                <div class="role-card" data-role="patient">
-                    <div class="role-icon">
-                        <i class="fas fa-user-injured"></i>
-                    </div>
-                    <h3>Patient</h3>
-                    <p>View medical records, book appointments, and manage medications</p>
-                </div>
-                
-                <div class="role-card" data-role="nurse">
-                    <div class="role-icon">
-                        <i class="fas fa-user-nurse"></i>
-                    </div>
-                    <h3>Nurse</h3>
-                    <p>Monitor patient vitals, update charts, and assist with procedures</p>
-                </div>
-                
-                <div class="role-card" data-role="receptionist">
-                    <div class="role-icon">
-                        <i class="fas fa-concierge-bell"></i>
-                    </div>
-                    <h3>Receptionist</h3>
-                    <p>Manage appointments, handle inquiries, and coordinate schedules</p>
-                </div>
-                
-                <div class="role-card" data-role="pharmacist">
-                    <div class="role-icon">
-                        <i class="fas fa-prescription-bottle-alt"></i>
-                    </div>
-                    <h3>Pharmacist</h3>
-                    <p>Dispense medications, check interactions, and manage inventory</p>
-                </div>
-            </div>
-            
-            <div class="role-footer">
-                <button class="back-btn" id="back-to-login">
-                    <i class="fas fa-arrow-left"></i>
-                    Back to Login
-                </button>
-            </div>
-        </div>
-    `;
+// Load dashboard
+function loadDashboard() {
+    userName.textContent = currentUser.name.split(' ')[0];
+    dashboardUserName.textContent = currentUser.name;
+    showPage('dashboard-page');
     
-    rolePage.innerHTML = roleSelectionHTML;
-    showPage('role-page');
+    // Setup event listeners
+    setupDashboardEvents();
+}
+
+// Setup dashboard event listeners
+function setupDashboardEvents() {
+    // Logout
+    logoutBtn.addEventListener('click', handleLogout);
     
-    // Add event listeners for role selection
-    document.querySelectorAll('.role-card').forEach(card => {
-        card.addEventListener('click', function() {
-            const role = this.getAttribute('data-role');
-            currentUser.role = role;
-            localStorage.setItem('mednemesis_user', JSON.stringify(currentUser));
-            loadDashboard(role);
+    // File uploads
+    uploadQuestionBtn.addEventListener('click', () => questionUpload.click());
+    uploadAnswerBtn.addEventListener('click', () => answerUpload.click());
+    
+    questionUpload.addEventListener('change', (e) => handleFileUpload(e, 'question'));
+    answerUpload.addEventListener('change', (e) => handleFileUpload(e, 'answer'));
+    
+    // Analysis sheet selection
+    analysisSheet.addEventListener('change', updateAnalysisButton);
+    
+    // Begin analysis
+    beginAnalysisBtn.addEventListener('click', beginAnalysis);
+    
+    // Results buttons
+    detailedAnalysisBtn.addEventListener('click', showDetailedAnalysis);
+    generatePaperBtn.addEventListener('click', showGeneratePaperModal);
+    
+    // Modal controls
+    closeModal.addEventListener('click', () => generatePaperModal.style.display = 'none');
+    generateFinalBtn.addEventListener('click', generatePracticePaper);
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === generatePaperModal) {
+            generatePaperModal.style.display = 'none';
+        }
+    });
+}
+
+// Handle file upload
+function handleFileUpload(event, type) {
+    const files = Array.from(event.target.files);
+    const fileListDiv = type === 'question' ? questionFileList : answerFileList;
+    const fileArray = type === 'question' ? questionFiles : answerFiles;
+    
+    // Clear existing files
+    fileArray.length = 0;
+    
+    if (files.length === 0) {
+        fileListDiv.innerHTML = '<p>No files selected</p>';
+        updateAnalysisButton();
+        return;
+    }
+    
+    // Store files
+    files.forEach(file => {
+        fileArray.push({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            file: file
         });
     });
     
-    document.getElementById('back-to-login').addEventListener('click', function() {
-        showPage('login-page');
+    // Update UI
+    fileListDiv.innerHTML = files.map(file => 
+        `<div class="file-item">
+            <i class="fas fa-file"></i>
+            <span>${file.name} (${formatFileSize(file.size)})</span>
+        </div>`
+    ).join('');
+    
+    updateAnalysisButton();
+}
+
+// Update analysis button state
+function updateAnalysisButton() {
+    const hasFiles = questionFiles.length > 0 && answerFiles.length > 0;
+    const hasSheet = analysisSheet.value !== '';
+    beginAnalysisBtn.disabled = !(hasFiles && hasSheet);
+}
+
+// Format file size
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Begin analysis
+async function beginAnalysis() {
+    if (questionFiles.length === 0 || answerFiles.length === 0) {
+        alert('Please upload both question and answer files');
+        return;
+    }
+    
+    if (!analysisSheet.value) {
+        alert('Please select an analysis sheet');
+        return;
+    }
+    
+    // Show progress section
+    progressSection.style.display = 'block';
+    resultsSection.style.display = 'none';
+    analysisResultsDiv.classList.remove('active');
+    
+    // Reset progress
+    progressFill.style.width = '0%';
+    progressDetails.innerHTML = '';
+    
+    // Simulate analysis process with streaming updates
+    await simulateAnalysisProcess();
+}
+
+// Simulate analysis with streaming updates
+async function simulateAnalysisProcess() {
+    const steps = [
+        { text: 'Processing uploaded files...', duration: 1000, progress: 10 },
+        { text: 'Extracting text from documents...', duration: 1500, progress: 25 },
+        { text: 'Identifying mathematical equations...', duration: 2000, progress: 40 },
+        { text: 'Analyzing question structure...', duration: 1500, progress: 55 },
+        { text: 'Evaluating student solutions...', duration: 2000, progress: 70 },
+        { text: 'Checking for mathematical errors...', duration: 1500, progress: 85 },
+        { text: 'Generating detailed analysis...', duration: 1000, progress: 100 }
+    ];
+    
+    for (const step of steps) {
+        progressText.textContent = step.text;
+        progressFill.style.width = step.progress + '%';
+        
+        // Add streaming update
+        const updateDiv = document.createElement('p');
+        updateDiv.textContent = step.text;
+        updateDiv.classList.add('success');
+        progressDetails.appendChild(updateDiv);
+        progressDetails.scrollTop = progressDetails.scrollHeight;
+        
+        // Wait for step duration
+        await wait(step.duration);
+    }
+    
+    // Complete analysis
+    progressText.textContent = 'Analysis complete!';
+    
+    // Generate sample analysis results
+    analysisResults = generateSampleAnalysis();
+    
+    // Show results after delay
+    await wait(1000);
+    progressSection.style.display = 'none';
+    resultsSection.style.display = 'block';
+    
+    // Update stats
+    totalQuestions.textContent = `${analysisResults.questions.length} questions analyzed`;
+}
+
+// Wait function
+function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Generate sample analysis data
+function generateSampleAnalysis() {
+    return {
+        sheetName: analysisSheet.options[analysisSheet.selectedIndex].text,
+        questions: [
+            {
+                id: 'Q1',
+                number: '1(a)',
+                originalQuestion: 'Evaluate $\\int (3x^2 + 2x + 1) \\, dx$',
+                studentAnswer: '$\\int (3x^2 + 2x + 1) \\, dx = x^3 + x^2 + x$',
+                correctAnswer: '$\\int (3x^2 + 2x + 1) \\, dx = x^3 + x^2 + x + C$',
+                mistakes: ['Missing constant of integration (C)'],
+                isCorrect: false,
+                explanation: 'When evaluating indefinite integrals, always include the constant of integration.'
+            },
+            {
+                id: 'Q2',
+                number: '1(b)',
+                originalQuestion: 'Find $\\frac{d}{dx}(\\sin(x^2))$',
+                studentAnswer: '$\\frac{d}{dx}(\\sin(x^2)) = \\cos(x^2)$',
+                correctAnswer: '$\\frac{d}{dx}(\\sin(x^2)) = 2x\\cos(x^2)$',
+                mistakes: ['Incorrect application of chain rule'],
+                isCorrect: false,
+                explanation: 'Apply chain rule: $\\frac{d}{dx}\\sin(f(x)) = f\'(x)\\cos(f(x))$'
+            },
+            {
+                id: 'Q3',
+                number: '2',
+                originalQuestion: 'Solve $\\frac{d^2y}{dx^2} - 3\\frac{dy}{dx} + 2y = 0$',
+                studentAnswer: '$y = Ae^x + Be^{2x}$',
+                correctAnswer: '$y = Ae^x + Be^{2x}$',
+                mistakes: [],
+                isCorrect: true,
+                explanation: 'Correct solution to the homogeneous second-order differential equation.'
+            },
+            {
+                id: 'Q4',
+                number: '3(a)',
+                originalQuestion: 'Evaluate $\\lim_{x \\to 0} \\frac{\\sin(3x)}{x}$',
+                studentAnswer: '$\\lim_{x \\to 0} \\frac{\\sin(3x)}{x} = 1$',
+                correctAnswer: '$\\lim_{x \\to 0} \\frac{\\sin(3x)}{x} = 3$',
+                mistakes: ['Forgot to multiply by 3 from the angle'],
+                isCorrect: false,
+                explanation: 'Using limit identity: $\\lim_{x \\to 0} \\frac{\\sin(kx)}{x} = k$'
+            },
+            {
+                id: 'Q5',
+                number: '4',
+                originalQuestion: 'Find the area between $y = x^2$ and $y = x$ from $x = 0$ to $x = 1$',
+                studentAnswer: 'Area = $\\int_0^1 (x - x^2) dx = \\frac{1}{6}$',
+                correctAnswer: 'Area = $\\int_0^1 (x - x^2) dx = \\frac{1}{6}$',
+                mistakes: [],
+                isCorrect: true,
+                explanation: 'Correct application of area between curves formula.'
+            }
+        ]
+    };
+}
+
+// Show detailed analysis
+function showDetailedAnalysis() {
+    if (!analysisResults) {
+        alert('Please complete analysis first');
+        return;
+    }
+    
+    analysisResultsDiv.innerHTML = `
+        <div class="analysis-header">
+            <h3>${analysisResults.sheetName}</h3>
+            <p>Detailed analysis of student work</p>
+        </div>
+        ${analysisResults.questions.map(question => `
+            <div class="question-item">
+                <div class="question-header">
+                    <span class="question-number">${question.number}</span>
+                    <span class="question-status ${question.isCorrect ? 'status-correct' : 'status-incorrect'}">
+                        ${question.isCorrect ? '✓ Correct' : '✗ Needs Review'}
+                    </span>
+                </div>
+                
+                <div class="question-content">
+                    <div class="section-title">Original Question</div>
+                    <div class="math-content">${question.originalQuestion}</div>
+                    
+                    <div class="section-title">Student's Answer</div>
+                    <div class="math-content">${question.studentAnswer}</div>
+                    
+                    ${!question.isCorrect ? `
+                        <div class="section-title">Mistakes Found</div>
+                        <ul class="mistakes-list">
+                            ${question.mistakes.map(mistake => `
+                                <li class="mistake-item">${mistake}</li>
+                            `).join('')}
+                        </ul>
+                    ` : ''}
+                    
+                    <div class="section-title">${question.isCorrect ? 'Correct Answer' : 'Corrected Solution'}</div>
+                    <div class="math-content">${question.correctAnswer}</div>
+                    
+                    <div class="section-title">Explanation</div>
+                    <div class="math-content">${question.explanation}</div>
+                </div>
+            </div>
+        `).join('')}
+    `;
+    
+    analysisResultsDiv.classList.add('active');
+    
+    // Typeset MathJax
+    if (window.MathJax) {
+        MathJax.typesetPromise([analysisResultsDiv]);
+    }
+}
+
+// Show generate paper modal
+function showGeneratePaperModal() {
+    if (!analysisResults) {
+        alert('Please complete analysis first');
+        return;
+    }
+    
+    // Populate question selector
+    questionSelectorList.innerHTML = analysisResults.questions
+        .filter(q => !q.isCorrect) // Only show incorrect questions
+        .map(question => `
+            <label class="question-checkbox">
+                <input type="checkbox" value="${question.id}" checked>
+                <span>${question.number}</span>
+            </label>
+        `).join('');
+    
+    // Generate preview
+    generatePreview();
+    
+    // Show modal
+    generatePaperModal.style.display = 'flex';
+}
+
+// Generate preview of redesigned questions
+function generatePreview() {
+    const selectedQuestions = analysisResults.questions.filter(q => !q.isCorrect);
+    
+    previewContent.innerHTML = selectedQuestions.map((question, index) => `
+        <div class="preview-item">
+            <div class="preview-header">
+                <strong>${question.number} (Redesigned)</strong>
+            </div>
+            <div class="original-question">
+                <strong>Original:</strong> ${question.originalQuestion}
+            </div>
+            <div class="redesigned-question">
+                <strong>Redesigned:</strong> ${generateRedesignedQuestion(question)}
+            </div>
+            ${index < selectedQuestions.length - 1 ? '<hr>' : ''}
+        </div>
+    `).join('');
+    
+    // Typeset MathJax
+    if (window.MathJax) {
+        MathJax.typesetPromise([previewContent]);
+    }
+}
+
+// Generate redesigned question
+function generateRedesignedQuestion(question) {
+    const original = question.originalQuestion;
+    
+    // Simple redesign by changing coefficients/variables
+    if (original.includes('\\int')) {
+        return original
+            .replace('3x^2', '4x^2')
+            .replace('2x', '3x')
+            .replace('1', '2');
+    } else if (original.includes('\\frac{d}{dx}')) {
+        return original
+            .replace('\\sin(x^2)', '\\cos(x^3)')
+            .replace('x^2', 'x^3');
+    } else if (original.includes('\\lim')) {
+        return original
+            .replace('\\sin(3x)', '\\sin(4x)')
+            .replace('3x', '4x');
+    } else {
+        // Default redesign
+        return original
+            .replace('3', '5')
+            .replace('2', '4')
+            .replace('1', '3');
+    }
+}
+
+// Generate practice paper
+function generatePracticePaper() {
+    const selectedIds = Array.from(
+        document.querySelectorAll('.question-checkbox input:checked')
+    ).map(input => input.value);
+    
+    const selectedQuestions = analysisResults.questions.filter(q => 
+        selectedIds.includes(q.id) && !q.isCorrect
+    );
+    
+    if (selectedQuestions.length === 0) {
+        alert('Please select at least one question to redesign');
+        return;
+    }
+    
+    // Create practice paper content
+    let paperContent = `Practice Paper - ${analysisResults.sheetName}\n\n`;
+    paperContent += '='.repeat(50) + '\n\n';
+    
+    selectedQuestions.forEach((question, index) => {
+        paperContent += `${index + 1}. ${generateRedesignedQuestion(question)}\n\n`;
+        paperContent += `   Based on original question: ${question.number}\n`;
+        paperContent += `   Student error: ${question.mistakes[0]}\n\n`;
+        paperContent += '   Space for solution:\n\n'.repeat(3);
+          paperContent += '-'.repeat(50) + '\n\n';
     });
-}
-
-// Load appropriate dashboard based on role
-function loadDashboard(role) {
-    let dashboardHTML = '';
     
-    switch(role) {
-        case 'doctor':
-            dashboardHTML = getDoctorDashboard();
-            break;
-        case 'patient':
-            dashboardHTML = getPatientDashboard();
-            break;
-        case 'nurse':
-            dashboardHTML = getNurseDashboard();
-            break;
-        case 'receptionist':
-            dashboardHTML = getReceptionistDashboard();
-            break;
-        case 'pharmacist':
-            dashboardHTML = getPharmacistDashboard();
-            break;
-        default:
-            dashboardHTML = getPatientDashboard();
-    }
+    // Create and download file
+    const blob = new Blob([paperContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Practice_Paper_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     
-    dashboardContainer.innerHTML = dashboardHTML;
-    showPage('dashboard-container');
+    // Close modal
+    generatePaperModal.style.display = 'none';
     
-    // Add logout functionality
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', handleLogout);
-    }
-    
-    // Add AI chat functionality if present
-    setupAIChat();
-}
-
-// Doctor Dashboard
-function getDoctorDashboard() {
-    return `
-        <div class="dashboard-container">
-            <header class="dashboard-header">
-                <div class="header-left">
-                    <h1>Doctor Dashboard</h1>
-                    <p>Welcome back, ${currentUser.name}</p>
-                </div>
-                <div class="header-right">
-                    <div class="user-menu">
-                        <div class="user-info">
-                            <span class="user-name">${currentUser.name}</span>
-                            <span class="user-role">${currentUser.specialty}</span>
-                        </div>
-                        <div class="user-avatar">
-                            <i class="fas fa-user-md"></i>
-                        </div>
-                        <button class="logout-btn" id="logout-btn">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <div class="dashboard-content">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-calendar-check"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>12</h3>
-                            <p>Today's Appointments</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-file-medical"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>8</h3>
-                            <p>Pending Reports</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>3</h3>
-                            <p>Urgent Cases</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-prescription"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>15</h3>
-                            <p>Prescriptions Today</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="content-grid">
-                    <div class="content-card">
-                        <h3>Today's Schedule</h3>
-                        <div class="schedule-list">
-                            <div class="schedule-item">
-                                <div class="time">09:00 AM</div>
-                                <div class="patient">Sarah Johnson - Follow-up</div>
-                                <div class="status confirmed">Confirmed</div>
-                            </div>
-                            <div class="schedule-item">
-                                <div class="time">10:30 AM</div>
-                                <div class="patient">Michael Brown - New Patient</div>
-                                <div class="status confirmed">Confirmed</div>
-                            </div>
-                            <div class="schedule-item">
-                                <div class="time">11:45 AM</div>
-                                <div class="patient">Emma Wilson - Consultation</div>
-                                <div class="status pending">Pending</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Quick Actions</h3>
-                        <div class="action-buttons">
-                            <button class="action-btn">
-                                <i class="fas fa-file-medical"></i>
-                                Write Prescription
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-notes-medical"></i>
-                                Add Medical Note
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-calendar-plus"></i>
-                                Schedule Appointment
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-vial"></i>
-                                Order Tests
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Medical Assistant AI</h3>
-                        <div class="ai-chat">
-                            <div class="chat-messages" id="ai-chat-messages">
-                                <div class="message ai-message">
-                                    <p>Hello Dr. Smith! I can help you with medical queries, drug information, or patient data analysis. What would you like to know?</p>
-                                </div>
-                            </div>
-                            <div class="chat-input">
-                                <input type="text" id="ai-chat-input" placeholder="Ask about medications, conditions, or patient data...">
-                                <button id="ai-chat-send">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Recent Patients</h3>
-                        <div class="patients-list">
-                            <div class="patient-item">
-                                <div class="patient-avatar">SJ</div>
-                                <div class="patient-info">
-                                    <h4>Sarah Johnson</h4>
-                                    <p>Hypertension • Last visit: 2 days ago</p>
-                                </div>
-                            </div>
-                            <div class="patient-item">
-                                <div class="patient-avatar">MB</div>
-                                <div class="patient-info">
-                                    <h4>Michael Brown</h4>
-                                    <p>Diabetes • Last visit: 1 week ago</p>
-                                </div>
-                            </div>
-                            <div class="patient-item">
-                                <div class="patient-avatar">EW</div>
-                                <div class="patient-info">
-                                    <h4>Emma Wilson</h4>
-                                    <p>Asthma • Last visit: 3 days ago</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// Patient Dashboard
-function getPatientDashboard() {
-    return `
-        <div class="dashboard-container">
-            <header class="dashboard-header">
-                <div class="header-left">
-                    <h1>Patient Dashboard</h1>
-                    <p>Welcome back, ${currentUser.name.split(' ')[0]}</p>
-                </div>
-                <div class="header-right">
-                    <div class="user-menu">
-                        <div class="user-info">
-                            <span class="user-name">${currentUser.name}</span>
-                            <span class="user-role">Patient ID: ${currentUser.patientId}</span>
-                        </div>
-                        <div class="user-avatar">
-                            <i class="fas fa-user-injured"></i>
-                        </div>
-                        <button class="logout-btn" id="logout-btn">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <div class="dashboard-content">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-calendar-check"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>2</h3>
-                            <p>Upcoming Appointments</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-prescription-bottle-alt"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>5</h3>
-                            <p>Active Medications</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-file-medical"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>12</h3>
-                            <p>Medical Records</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-bell"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>3</h3>
-                            <p>Pending Reminders</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="content-grid">
-                    <div class="content-card">
-                        <h3>My Appointments</h3>
-                        <div class="appointment-list">
-                            <div class="appointment-item">
-                                <div class="appointment-date">Tomorrow, 10:30 AM</div>
-                                <div class="appointment-details">
-                                    <h4>Dr. Jonathan Smith</h4>
-                                    <p>Cardiology Follow-up</p>
-                                </div>
-                                <button class="action-btn small">Reschedule</button>
-                            </div>
-                            <div class="appointment-item">
-                                <div class="appointment-date">June 15, 2:00 PM</div>
-                                <div class="appointment-details">
-                                    <h4>Dr. Emily Chen</h4>
-                                    <p>Annual Check-up</p>
-                                </div>
-                                <button class="action-btn small">Cancel</button>
-                            </div>
-                        </div>
-                        <button class="action-btn full-width">
-                            <i class="fas fa-calendar-plus"></i>
-                            Book New Appointment
-                        </button>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Current Medications</h3>
-                        <div class="medication-list">
-                            <div class="medication-item">
-                                <div class="medication-name">Lisinopril 10mg</div>
-                                <div class="medication-schedule">Once daily, Morning</div>
-                                <div class="medication-status active">Active</div>
-                            </div>
-                            <div class="medication-item">
-                                <div class="medication-name">Atorvastatin 20mg</div>
-                                <div class="medication-schedule">Once daily, Evening</div>
-                                <div class="medication-status active">Active</div>
-                            </div>
-                            <div class="medication-item">
-                                <div class="medication-name">Metformin 500mg</div>
-                                <div class="medication-schedule">Twice daily</div>
-                                <div class="medication-status active">Active</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Health Assistant AI</h3>
-                        <div class="ai-chat">
-                            <div class="chat-messages" id="ai-chat-messages">
-                                <div class="message ai-message">
-                                    <p>Hello ${currentUser.name.split(' ')[0]}! I can help answer your health questions, explain medical terms, or provide information about your medications. How can I assist you today?</p>
-                                </div>
-                            </div>
-                            <div class="chat-input">
-                                <input type="text" id="ai-chat-input" placeholder="Ask about your health, medications, or appointments...">
-                                <button id="ai-chat-send">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Quick Access</h3>
-                        <div class="quick-actions">
-                            <button class="quick-btn">
-                                <i class="fas fa-file-medical"></i>
-                                View Medical Records
-                            </button>
-                            <button class="quick-btn">
-                                <i class="fas fa-prescription"></i>
-                                Request Prescription Refill
-                            </button>
-                            <button class="quick-btn">
-                                <i class="fas fa-download"></i>
-                                Download Health Summary
-                            </button>
-                            <button class="quick-btn">
-                                <i class="fas fa-phone-alt"></i>
-                                Contact My Doctor
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// Nurse Dashboard
-function getNurseDashboard() {
-    return `
-        <div class="dashboard-container">
-            <header class="dashboard-header">
-                <div class="header-left">
-                    <h1>Nurse Dashboard</h1>
-                    <p>Welcome back, ${currentUser.name}</p>
-                </div>
-                <div class="header-right">
-                    <div class="user-menu">
-                        <div class="user-info">
-                            <span class="user-name">${currentUser.name}</span>
-                            <span class="user-role">${currentUser.department}</span>
-                        </div>
-                        <div class="user-avatar">
-                            <i class="fas fa-user-nurse"></i>
-                        </div>
-                        <button class="logout-btn" id="logout-btn">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <div class="dashboard-content">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-bed"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>8</h3>
-                            <p>Patients Assigned</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-heartbeat"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>24</h3>
-                            <p>Vitals to Check</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-syringe"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>12</h3>
-                            <p>Medications Due</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>2</h3>
-                            <p>Critical Alerts</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="content-grid">
-                    <div class="content-card">
-                        <h3>Patient Rounds</h3>
-                        <div class="schedule-list">
-                            <div class="schedule-item">
-                                <div class="time">Room 201</div>
-                                <div class="patient">John Davis - Post-op Monitoring</div>
-                                <div class="status critical">Critical</div>
-                            </div>
-                            <div class="schedule-item">
-                                <div class="time">Room 305</div>
-                                <div class="patient">Maria Garcia - IV Medication</div>
-                                <div class="status confirmed">Due Now</div>
-                            </div>
-                            <div class="schedule-item">
-                                <div class="time">Room 412</div>
-                                <div class="patient">Robert Wilson - Vital Signs</div>
-                                <div class="status pending">Pending</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Quick Actions</h3>
-                        <div class="action-buttons">
-                            <button class="action-btn">
-                                <i class="fas fa-heartbeat"></i>
-                                Record Vitals
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-syringe"></i>
-                                Administer Medication
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-file-medical"></i>
-                                Update Chart
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-bell"></i>
-                                Alert Doctor
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Nursing Assistant AI</h3>
-                        <div class="ai-chat">
-                            <div class="chat-messages" id="ai-chat-messages">
-                                <div class="message ai-message">
-                                    <p>Hello Nurse ${currentUser.name.split(' ')[0]}! I can help with medication protocols, vital sign ranges, or patient care procedures. How can I assist you?</p>
-                                </div>
-                            </div>
-                            <div class="chat-input">
-                                <input type="text" id="ai-chat-input" placeholder="Ask about procedures, medications, or patient care...">
-                                <button id="ai-chat-send">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Recent Patient Updates</h3>
-                        <div class="patients-list">
-                            <div class="patient-item">
-                                <div class="patient-avatar">JD</div>
-                                <div class="patient-info">
-                                    <h4>John Davis</h4>
-                                    <p>Room 201 • BP: 145/92 • Last update: 30 min ago</p>
-                                </div>
-                            </div>
-                            <div class="patient-item">
-                                <div class="patient-avatar">MG</div>
-                                <div class="patient-info">
-                                    <h4>Maria Garcia</h4>
-                                    <p>Room 305 • Temp: 38.2°C • Needs attention</p>
-                                </div>
-                            </div>
-                            <div class="patient-item">
-                                <div class="patient-avatar">RW</div>
-                                <div class="patient-info">
-                                    <h4>Robert Wilson</h4>
-                                    <p>Room 412 • Stable • Next vitals due: 2 hours</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// Receptionist Dashboard
-function getReceptionistDashboard() {
-    return `
-        <div class="dashboard-container">
-            <header class="dashboard-header">
-                <div class="header-left">
-                    <h1>Receptionist Dashboard</h1>
-                    <p>Welcome back, ${currentUser.name}</p>
-                </div>
-                <div class="header-right">
-                    <div class="user-menu">
-                        <div class="user-info">
-                            <span class="user-name">${currentUser.name}</span>
-                            <span class="user-role">${currentUser.location}</span>
-                        </div>
-                        <div class="user-avatar">
-                            <i class="fas fa-concierge-bell"></i>
-                        </div>
-                        <button class="logout-btn" id="logout-btn">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <div class="dashboard-content">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-calendar-day"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>45</h3>
-                            <p>Today's Appointments</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-user-clock"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>8</h3>
-                            <p>Waiting Patients</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-phone"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>23</h3>
-                            <p>Calls Today</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-envelope"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>15</h3>
-                            <p>Pending Messages</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="content-grid">
-                    <div class="content-card">
-                        <h3>Current Waiting Room</h3>
-                        <div class="schedule-list">
-                            <div class="schedule-item">
-                                <div class="time">Token #15</div>
-                                <div class="patient">Lisa Thompson - Dr. Smith</div>
-                                <div class="status confirmed">Waiting: 5 min</div>
-                            </div>
-                            <div class="schedule-item">
-                                <div class="time">Token #16</div>
-                                <div class="patient">James Miller - Dr. Chen</div>
-                                <div class="status confirmed">Waiting: 12 min</div>
-                            </div>
-                            <div class="schedule-item">
-                                <div class="time">Token #17</div>
-                                <div class="patient">Anna Davis - Dr. Rodriguez</div>
-                                <div class="status pending">Checked In</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Quick Actions</h3>
-                        <div class="action-buttons">
-                            <button class="action-btn">
-                                <i class="fas fa-user-plus"></i>
-                                Check-in Patient
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-calendar-plus"></i>
-                                New Appointment
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-file-invoice"></i>
-                                Process Payment
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-phone"></i>
-                                Call Patient
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Reception Assistant AI</h3>
-                        <div class="ai-chat">
-                            <div class="chat-messages" id="ai-chat-messages">
-                                <div class="message ai-message">
-                                    <p>Hello ${currentUser.name.split(' ')[0]}! I can help with appointment scheduling, patient information, or administrative queries. What do you need assistance with?</p>
-                                </div>
-                            </div>
-                            <div class="chat-input">
-                                <input type="text" id="ai-chat-input" placeholder="Ask about appointments, patients, or procedures...">
-                                <button id="ai-chat-send">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Upcoming Appointments</h3>
-                        <div class="appointment-list">
-                            <div class="appointment-item">
-                                <div class="appointment-date">Next 30 min</div>
-                                <div class="appointment-details">
-                                    <h4>Dr. Jonathan Smith</h4>
-                                    <p>Sarah Johnson - Follow-up</p>
-                                </div>
-                                <button class="action-btn small">Notify</button>
-                            </div>
-                            <div class="appointment-item">
-                                <div class="appointment-date">Next 45 min</div>
-                                <div class="appointment-details">
-                                    <h4>Dr. Emily Chen</h4>
-                                    <p>Michael Brown - Consultation</p>
-                                </div>
-                                <button class="action-btn small">Prepare</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// Pharmacist Dashboard
-function getPharmacistDashboard() {
-    return `
-        <div class="dashboard-container">
-            <header class="dashboard-header">
-                <div class="header-left">
-                    <h1>Pharmacist Dashboard</h1>
-                    <p>Welcome back, ${currentUser.name}</p>
-                </div>
-                <div class="header-right">
-                    <div class="user-menu">
-                        <div class="user-info">
-                            <span class="user-name">${currentUser.name}</span>
-                            <span class="user-role">${currentUser.pharmacy}</span>
-                        </div>
-                        <div class="user-avatar">
-                            <i class="fas fa-prescription-bottle-alt"></i>
-                        </div>
-                        <button class="logout-btn" id="logout-btn">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <div class="dashboard-content">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-prescription"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>28</h3>
-                            <p>Pending Prescriptions</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-capsules"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>5</h3>
-                            <p>Low Stock Items</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>3</h3>
-                            <p>Interaction Alerts</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-phone"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3>7</h3>
-                            <p>Doctor Calls Needed</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="content-grid">
-                    <div class="content-card">
-                        <h3>Prescription Queue</h3>
-                        <div class="schedule-list">
-                            <div class="schedule-item">
-                                <div class="time">#P-7842</div>
-                                <div class="patient">Sarah Johnson - Dr. Smith</div>
-                                <div class="status critical">Interaction Alert</div>
-                            </div>
-                            <div class="schedule-item">
-                                <div class="time">#P-8192</div>
-                                <div class="patient">Michael Brown - Dr. Chen</div>
-                                <div class="status confirmed">Ready in 15 min</div>
-                            </div>
-                            <div class="schedule-item">
-                                <div class="time">#P-8021</div>
-                                <div class="patient">Emma Wilson - Dr. Rodriguez</div>
-                                <div class="status pending">Processing</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Quick Actions</h3>
-                        <div class="action-buttons">
-                            <button class="action-btn">
-                                <i class="fas fa-prescription"></i>
-                                Fill Prescription
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-search"></i>
-                                Check Interactions
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-box"></i>
-                                Inventory Check
-                            </button>
-                            <button class="action-btn">
-                                <i class="fas fa-phone"></i>
-                                Contact Doctor
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Pharmacy Assistant AI</h3>
-                        <div class="ai-chat">
-                            <div class="chat-messages" id="ai-chat-messages">
-                                <div class="message ai-message">
-                                    <p>Hello ${currentUser.name.split(' ')[0]}! I can help with drug information, interaction checks, dosage calculations, or inventory queries. What do you need to know?</p>
-                                </div>
-                            </div>
-                            <div class="chat-input">
-                                <input type="text" id="ai-chat-input" placeholder="Ask about medications, interactions, or inventory...">
-                                <button id="ai-chat-send">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <h3>Low Stock Alert</h3>
-                        <div class="medication-list">
-                            <div class="medication-item">
-                                <div class="medication-name">Lisinopril 10mg</div>
-                                <div class="medication-schedule">Stock: 12 units</div>
-                                <div class="medication-status critical">Low</div>
-                            </div>
-                            <div class="medication-item">
-                                <div class="medication-name">Atorvastatin 20mg</div>
-                                <div class="medication-schedule">Stock: 8 units</div>
-                                <div class="medication-status critical">Very Low</div>
-                            </div>
-                            <div class="medication-item">
-                                <div class="medication-name">Metformin 500mg</div>
-                                <div class="medication-schedule">Stock: 25 units</div>
-                                <div class="medication-status warning">Monitor</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
+    alert('Practice paper downloaded successfully!');
 }
 
 // Show specific page
@@ -1025,60 +521,188 @@ function showPage(pageId) {
 // Handle logout
 function handleLogout() {
     currentUser = null;
-    localStorage.removeItem('mednemesis_user');
+    localStorage.removeItem('math_ocr_user');
     showPage('login-page');
     
     // Clear login form
     document.getElementById('email').value = '';
     document.getElementById('password').value = '';
+    
+    // Reset state
+    questionFiles = [];
+    answerFiles = [];
+    analysisResults = null;
+    questionFileList.innerHTML = '<p>No files selected</p>';
+    answerFileList.innerHTML = '<p>No files selected</p>';
+    analysisSheet.value = '';
+    progressSection.style.display = 'none';
+    resultsSection.style.display = 'none';
+    analysisResultsDiv.classList.remove('active');
+    analysisResultsDiv.innerHTML = '';
 }
 
-// Setup AI chat functionality
-function setupAIChat() {
-    const chatInput = document.getElementById('ai-chat-input');
-    const chatSend = document.getElementById('ai-chat-send');
-    const chatMessages = document.getElementById('ai-chat-messages');
-
-    if (chatInput && chatSend && chatMessages) {
-        const sendMessage = () => {
-            const message = chatInput.value.trim();
-            if (!message) return;
-            
-            // Add user message
-            addChatMessage(chatMessages, message, 'user');
-            chatInput.value = '';
-            
-            // Simulate AI response
-            setTimeout(() => {
-                const response = generateAIResponse(message);
-                addChatMessage(chatMessages, response, 'ai');
-            }, 1000);
-        };
-
-        chatSend.addEventListener('click', sendMessage);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
+// Handle page visibility
+function handleVisibilityChange() {
+    if (!document.hidden && currentUser) {
+        // Refresh MathJax when page becomes visible
+        if (window.MathJax && analysisResultsDiv.classList.contains('active')) {
+            MathJax.typesetPromise([analysisResultsDiv]);
+        }
     }
 }
 
-// Add message to chat
-function addChatMessage(container, text, sender) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}-message`;
-    messageDiv.innerHTML = `<p>${text}</p>`;
-    container.appendChild(messageDiv);
-    container.scrollTop = container.scrollHeight;
+// Initialize visibility handler
+document.addEventListener('visibilitychange', handleVisibilityChange);
+
+// Real file upload to backend (for actual implementation)
+async function uploadFilesToBackend() {
+    if (questionFiles.length === 0 || answerFiles.length === 0) {
+        return false;
+    }
+    
+    const formData = new FormData();
+    
+    // Add question files
+    questionFiles.forEach((fileObj, index) => {
+        formData.append('question_files', fileObj.file);
+    });
+    
+    // Add answer files
+    answerFiles.forEach((fileObj, index) => {
+        formData.append('answer_files', fileObj.file);
+    });
+    
+    // Add analysis sheet info
+    formData.append('analysis_sheet', analysisSheet.value);
+    
+    try {
+        // This is where you would make the actual API call
+        // const response = await fetch('/api/analyze', {
+        //     method: 'POST',
+        //     body: formData
+        // });
+        
+        // For now, we'll use the simulated version
+        return true;
+    } catch (error) {
+        console.error('Upload error:', error);
+        alert('Failed to upload files. Please try again.');
+        return false;
+    }
 }
 
-// Generate AI response
-function generateAIResponse(message) {
-    const responses = [
-        "I understand your concern. Let me provide some information about that.",
-        "Based on medical guidelines, here's what I can share about your query:",
-        "I recommend consulting with your healthcare provider for personalized medical advice.",
-        "That's an important health question. Here's some general information that might help:",
-        "I can help with general health information. For specific medical concerns, please contact your doctor."
-    ];
-    return responses[Math.floor(Math.random() * responses.length)];
+// Real-time WebSocket connection for streaming analysis
+function setupWebSocket() {
+    // This would be implemented for real-time updates
+    const ws = new WebSocket('ws://localhost:8000/ws');
+    
+    ws.onopen = () => {
+        console.log('WebSocket connected');
+    };
+    
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        handleWebSocketMessage(data);
+    };
+    
+    ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+    };
+    
+    ws.onclose = () => {
+        console.log('WebSocket disconnected');
+    };
 }
+
+// Handle WebSocket messages
+function handleWebSocketMessage(data) {
+    if (data.type === 'progress') {
+        progressText.textContent = data.message;
+        progressFill.style.width = data.progress + '%';
+        
+        const updateDiv = document.createElement('p');
+        updateDiv.textContent = data.message;
+        updateDiv.classList.add('success');
+        progressDetails.appendChild(updateDiv);
+        progressDetails.scrollTop = progressDetails.scrollHeight;
+    } else if (data.type === 'result') {
+        analysisResults = data.data;
+        progressSection.style.display = 'none';
+        resultsSection.style.display = 'block';
+        totalQuestions.textContent = `${analysisResults.questions.length} questions analyzed`;
+    } else if (data.type === 'error') {
+        const errorDiv = document.createElement('p');
+        errorDiv.textContent = `Error: ${data.message}`;
+        errorDiv.classList.add('error');
+        progressDetails.appendChild(errorDiv);
+        progressDetails.scrollTop = progressDetails.scrollHeight;
+    }
+}
+
+// Initialize WebSocket on dashboard load
+if (dashboardPage.classList.contains('active')) {
+    // setupWebSocket(); // Uncomment for real WebSocket implementation
+}
+
+// Additional helper functions
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Handle window resize
+window.addEventListener('resize', debounce(() => {
+    // Re-render MathJax on resize
+    if (window.MathJax && analysisResultsDiv.classList.contains('active')) {
+        MathJax.typesetPromise([analysisResultsDiv]);
+    }
+}, 250));
+
+// Prevent form submission on enter in inputs
+document.querySelectorAll('input').forEach(input => {
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && input.type !== 'submit') {
+            e.preventDefault();
+        }
+    });
+});
+
+// Enhanced error handling
+window.addEventListener('error', (event) => {
+    console.error('Global error:', event.error);
+    // You could send this to an error tracking service
+});
+
+// Unload handler
+window.addEventListener('beforeunload', (event) => {
+    if (progressSection.style.display === 'block') {
+        // Warn user if analysis is in progress
+        event.preventDefault();
+        event.returnValue = 'Analysis is in progress. Are you sure you want to leave?';
+        return event.returnValue;
+    }
+});
+
+// Initialize MathJax typesetting for dynamic content
+function refreshMathJax() {
+    if (window.MathJax) {
+        MathJax.typesetPromise();
+    }
+}
+
+// Make functions available globally for event handlers
+window.handleLogout = handleLogout;
+window.showDetailedAnalysis = showDetailedAnalysis;
+window.showGeneratePaperModal = showGeneratePaperModal;
+window.generatePracticePaper = generatePracticePaper;
+
+
+
+        
