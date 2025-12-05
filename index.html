@@ -322,6 +322,8 @@ async function performAnalysisStreaming(formData) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
         let buffer = '';
+        let analysisString = '';
+        let detailedObj = { questions: [] };
         
         while (true) {
             const { done, value } = await reader.read();
@@ -329,23 +331,23 @@ async function performAnalysisStreaming(formData) {
             
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
-            buffer = lines.pop(); // Keep incomplete line in buffer
+            buffer = lines.pop();
             
             for (const line of lines) {
                 const trimmedLine = line.trim();
                 if (!trimmedLine) continue;
                 
                 try {
-                    // FIX 1: Check if it's valid JSON first
-                    if (!trimmedLine.startsWith('{')) {
-                        console.log('Skipping non-JSON:', trimmedLine.substring(0, 50));
+                    // SAFE JSON CHECK
+                    const trimmed = trimmedLine.trim();
+                    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+                        console.log('Non-JSON data:', trimmed.substring(0, 50));
                         continue;
                     }
                     
-                    const data = JSON.parse(trimmedLine); // <-- NOW SAFE
-                    console.log('Stream:', data.status);
+                    const data = JSON.parse(trimmed);
                     
-                    // FIX 2: Handle progress updates
+                    // Handle progress
                     if (data.progress !== undefined) {
                         document.querySelector('.progress-fill').style.width = `${data.progress}%`;
                     }
@@ -359,19 +361,22 @@ async function performAnalysisStreaming(formData) {
                         messagesContainer.scrollTop = messagesContainer.scrollHeight;
                     }
                     
-                    // FIX 3: Handle completion properly
+                    // Handle completion - FIXED DATA STORAGE
                     if (data.status === 'complete') {
-                        // STORE AS STRING, NOT OBJECT
-                        analysisData = data.response || ''; 
+                        // Store as STRING for .match() to work
+                        analysisData = data.response || '';
                         detailedData = data.detailed_data || { questions: [] };
                         
-                        console.log('Analysis stored:', typeof analysisData);
+                        console.log('Analysis stored as:', typeof analysisData);
                         
                         if (window.MathJax) {
                             setTimeout(() => MathJax.typesetPromise(), 100);
                         }
                         
-                        return { response: data.response, detailed_data: data.detailed_data };
+                        return { 
+                            response: data.response, 
+                            detailed_data: data.detailed_data 
+                        };
                     }
                     
                     if (data.status === 'error') {
@@ -379,8 +384,7 @@ async function performAnalysisStreaming(formData) {
                     }
                     
                 } catch (e) {
-                    console.log('Skipping malformed JSON line');
-                    // Don't throw, just skip bad lines
+                    console.log('Skipping invalid JSON:', trimmedLine.substring(0, 100));
                 }
             }
         }
@@ -484,65 +488,72 @@ async function performAnalysisStreaming(formData) {
     content.innerHTML = '<div class="streaming-placeholder">Generating performance report...</div>';
     
     setTimeout(() => {
-        // FIX: Check and convert to string
+        // FIX: Convert to string safely
+        let analysisText = '';
+        
         if (!analysisData) {
             content.innerHTML = '<p>No analysis data available.</p>';
             return;
         }
         
-        // Ensure it's a string
-        const analysisText = typeof analysisData === 'string' ? analysisData : 
-                            (analysisData.response || JSON.stringify(analysisData));
-        
-        // Now safe to use .match()
-        const tableMatch = analysisText.match(/\| Concept No\. \| Concept.*?(?=## Performance Insights|\|\s*$)/s);
-                let tableHTML = '<p>Performance data not available</p>';
-                
-                if (tableMatch) {
-                    tableHTML = `
-                        <div class="performance-table-container">
-                            <h3>Concept Performance Analysis</h3>
-                            <table class="performance-table">
-                                <thead>
-                                    <tr>
-                                        <th width="10%">Concept No.</th>
-                                        <th width="35%">Concept (With Explanation)</th>
-                                        <th width="25%">Example</th>
-                                        <th width="30%">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${parsePerformanceTable(tableMatch[0])}
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
-                }
-                
-                // Extract insights - FIXED: Separate from table
-                const insightsMatch = analysisData.match(/## Performance Insights[\s\S]*$/);
-                let insightsHTML = '';
-                if (insightsMatch) {
-                    const insightsText = insightsMatch[0].replace(/## Performance Insights\s*/, '');
-                    insightsHTML = `
-                        <div class="performance-insights">
-                            <h3>📊 Performance Insights</h3>
-                            <div class="insight-content">${formatMathContent(insightsText)}</div>
-                        </div>
-                    `;
-                }
-                
-                content.innerHTML = tableHTML + insightsHTML;
-                
-                // Render MathJax
-                if (window.MathJax) {
-                    setTimeout(() => {
-                        MathJax.typesetPromise([content]);
-                    }, 500);
-                }
-            }, 800);
+        // CONVERT ANYTHING to string
+        if (typeof analysisData === 'string') {
+            analysisText = analysisData;
+        } else if (analysisData.response) {
+            analysisText = analysisData.response;
+        } else if (analysisData.raw) {
+            analysisText = analysisData.raw;
+        } else {
+            analysisText = JSON.stringify(analysisData, null, 2);
         }
-
+        
+        // NOW safe to use .match()
+        const tableMatch = analysisText.match(/\| Concept No\. \| Concept.*?(?=## Performance Insights|\|\s*$)/s);
+        let tableHTML = '<p>Performance data not available</p>';
+        
+        if (tableMatch) {
+            tableHTML = `
+                <div class="performance-table-container">
+                    <h3>Concept Performance Analysis</h3>
+                    <table class="performance-table">
+                        <thead>
+                            <tr>
+                                <th width="10%">Concept No.</th>
+                                <th width="35%">Concept (With Explanation)</th>
+                                <th width="25%">Example</th>
+                                <th width="30%">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${parsePerformanceTable(tableMatch[0])}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+        
+        // Extract insights - FIXED: Use analysisText, not analysisData
+        const insightsMatch = analysisText.match(/## Performance Insights[\s\S]*$/);
+        let insightsHTML = '';
+        if (insightsMatch) {
+            const insightsText = insightsMatch[0].replace(/## Performance Insights\s*/, '');
+            insightsHTML = `
+                <div class="performance-insights">
+                    <h3>📊 Performance Insights</h3>
+                    <div class="insight-content">${formatMathContent(insightsText)}</div>
+                </div>
+            `;
+        }
+        
+        content.innerHTML = tableHTML + insightsHTML;
+        
+        if (window.MathJax) {
+            setTimeout(() => {
+                MathJax.typesetPromise([content]);
+            }, 500);
+        }
+    }, 800);
+}
         function parsePerformanceTable(tableText) {
             const rows = tableText.split('\n').filter(line => line.trim().startsWith('|'));
             let tableHTML = '';
@@ -1075,5 +1086,6 @@ async function performAnalysisStreaming(formData) {
     </script>
 </body>
 </html>
+
 
 
