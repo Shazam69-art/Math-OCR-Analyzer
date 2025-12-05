@@ -217,8 +217,8 @@ async def analyze_chat(
                     "message": "Sending to Gemini for analysis..."
                 }) + "\n"
                 
-try:
-  system_prompt = """Analyze math work. Output format:
+                # CORRECTED TRY BLOCK - Properly closed with except
+                system_prompt = """Analyze math work. Output format:
 
 Question [ID]:
 Question: [text]
@@ -226,7 +226,8 @@ Student: [solution]
 Errors: [brief]
 Correct: [solution]
 
-Keep under 200 words."""      
+Keep under 200 words."""
+                
                 # Prepare content for Gemini
                 contents = [system_prompt]
                 if message:
@@ -292,7 +293,6 @@ Keep under 200 words."""
     except Exception as e:
         logger.error(f"Analysis setup failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Analysis setup failed: {str(e)}")
-
 
 def parse_detailed_data_improved(response_text):
     """IMPROVED parsing of AI response with better structure and error detection."""
@@ -1180,6 +1180,7 @@ async def generate_practice_pdf(request: Request):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+
 
 
 
