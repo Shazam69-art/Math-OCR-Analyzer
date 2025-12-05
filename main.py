@@ -217,22 +217,10 @@ async def analyze_chat(
                     "message": "Sending to Gemini for analysis..."
                 }) + "\n"
                 
-                # COMPLETE SYSTEM PROMPT WITH ALL TABLE ROWS
-          # Replace your HUGE system prompt with this MINIMAL version:
-system_prompt = """Analyze math work. Output format:
-
-Question [ID]:
-Question: [text]
-Student: [solution]
-Errors: [one line]
-Correct: [solution]
-
-Table (update):
-| Concept | Status |
-|---|---|
-| Integration | Tested/Not |
-
-Keep under 300 words total."""
+try:
+    system_prompt = """Analyze math work...
+    ... huge prompt ...
+    """
                 
                 # Prepare content for Gemini
                 contents = [system_prompt]
@@ -1187,6 +1175,7 @@ async def generate_practice_pdf(request: Request):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+
 
 
 
