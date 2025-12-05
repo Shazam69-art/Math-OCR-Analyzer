@@ -218,10 +218,15 @@ async def analyze_chat(
                 }) + "\n"
                 
 try:
-    system_prompt = """Analyze math work...
-    ... huge prompt ...
-    """
-                
+  system_prompt = """Analyze math work. Output format:
+
+Question [ID]:
+Question: [text]
+Student: [solution]
+Errors: [brief]
+Correct: [solution]
+
+Keep under 200 words."""      
                 # Prepare content for Gemini
                 contents = [system_prompt]
                 if message:
@@ -1175,6 +1180,7 @@ async def generate_practice_pdf(request: Request):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+
 
 
 
