@@ -211,9 +211,8 @@ async def start_analysis(job_id: str, websocket: WebSocket):
         
         await send_progress(websocket, 40, "Analyzing student answers...")
         
-        # System prompt for math analysis
-     # System prompt for math analysis - UPDATED VERSION
-system_prompt = """CRITICAL: You are analyzing scanned math exam papers. You MUST follow these rules STRICTLY:
+        # System prompt for math analysis - UPDATED VERSION
+        system_prompt = """CRITICAL: You are analyzing scanned math exam papers. You MUST follow these rules STRICTLY:
 
 1. EXTRACT EVERY SINGLE QUESTION from the images. Do NOT miss any.
 2. Question numbers must be EXACT as shown (e.g., "1", "2(a)", "Q3", "Question 4").
@@ -270,7 +269,6 @@ If student left blank, write "BLANK" as student answer and provide full solution
                 "message": "Analysis timed out. Please try with fewer images or smaller files."
             })
             return
-        
         await send_progress(websocket, 80, "Parsing analysis results...")
         
         # Parse the response
@@ -527,6 +525,7 @@ async def cleanup_old_files():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
