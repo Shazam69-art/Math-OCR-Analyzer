@@ -73,7 +73,6 @@
             </div>
         </div>
     </div>
-
     <!-- Dashboard Page -->
     <div id="dashboardPage" class="page">
         <div class="dashboard-container">
@@ -91,7 +90,6 @@
                     <button class="logout-btn" id="logoutBtn">🚪</button>
                 </div>
             </div>
-
             <!-- Main Buttons -->
             <div class="action-buttons">
                 <button class="action-btn detailed-btn" id="uploadQuestionBtn">Upload Question</button>
@@ -105,7 +103,6 @@
                 <button class="action-btn generate-btn" id="detailAnalysisBtn">Detail Analysis</button>
                 <button class="action-btn generate-btn" id="generatePaperBtn">Generate Question Paper</button>
             </div>
-
             <!-- Progress Section -->
             <div class="progress-card" id="progressSection" style="display: none;">
                 <h3>Analysis Progress</h3>
@@ -116,7 +113,6 @@
                 </div>
                 <div class="progress-details" id="progressDetails"></div>
             </div>
-
             <!-- Results Section -->
             <div class="results-section" id="resultsSection" style="display: none;">
                 <div class="results-header">
@@ -125,7 +121,6 @@
                 </div>
                 <div id="questionsContainer"></div>
             </div>
-
             <!-- Generated Paper Section -->
             <div class="results-section" id="generatedPaperSection" style="display: none;">
                 <div class="results-header">
@@ -133,20 +128,17 @@
                 </div>
                 <div id="generatedQuestionsContainer"></div>
             </div>
-
             <!-- Error and Success Messages -->
             <div class="error-message" id="errorMessage"></div>
             <div class="success-message" id="successMessage"></div>
         </div>
     </div>
-
     <script>
         // State
         let questionFiles = [];
         let answerFiles = [];
         let analysisData = null;
         let generatedPaper = null;
-
         // DOM Elements
         const loginPage = document.getElementById('loginPage');
         const dashboardPage = document.getElementById('dashboardPage');
@@ -211,12 +203,10 @@
         // Upload Buttons
         uploadQuestionBtn.addEventListener('click', () => questionInput.click());
         uploadAnswerBtn.addEventListener('click', () => answerInput.click());
-
         questionInput.addEventListener('change', async (e) => {
             const files = Array.from(e.target.files);
             await uploadFiles(files, 'question');
         });
-
         answerInput.addEventListener('change', async (e) => {
             const files = Array.from(e.target.files);
             await uploadFiles(files, 'answer');
@@ -315,9 +305,8 @@
                     if (done) break;
                     const chunk = new TextDecoder().decode(value);
                     fullText += chunk;
-                    // Simulate progress without showing raw chunks
                     const currentWidth = parseFloat(progressFill.style.width) || 0;
-                    progressFill.style.width = `${Math.min(currentWidth + 5, 95)}%`; // Up to 95% until done
+                    progressFill.style.width = `${Math.min(currentWidth + 5, 95)}%`;
                 }
                 const questions = parseGeminiResponse(fullText);
                 analysisData = questions;
@@ -329,7 +318,7 @@
             } finally {
                 setTimeout(() => {
                     progressSection.style.display = 'none';
-                }, 1000); // Hide after short delay
+                }, 1000);
             }
         }
 
@@ -343,19 +332,19 @@
                 const lines = section.split("\n");
                 const question_data = {
                     id: "",
-                    question_text: "",
-                    student_answer: "",
+                    question_text: "$$\text{No question text found}$$", // Fallback
+                    student_answer: "$$\text{No answer provided}$$", // Fallback
                     mistakes: [],
-                    corrected_solution: "",
+                    corrected_solution: "$$\text{No corrected solution}$$", // Fallback
                     is_correct: false
                 };
                 let current_section = null;
                 lines.forEach(line => {
                     line = line.trim();
                     if (line.startsWith("QUESTION")) {
-                        const parts = line.split(":", 2); // Split into 2 parts
+                        const parts = line.split(":", 2);
                         question_data.id = parts[0].replace("QUESTION", "").trim();
-                        if (parts.length > 1) question_data.question_text = parts[1].trim();
+                        if (parts.length > 1) question_data.question_text = `$$${parts[1].trim()}$$`;
                     } else if (line === "STUDENT'S ANSWER:") {
                         current_section = "student";
                     } else if (line === "MISTAKES:") {
@@ -365,31 +354,26 @@
                     } else if (line.startsWith("MATCH:")) {
                         question_data.is_correct = line.toUpperCase().includes("YES");
                     } else if (current_section === "student" && line) {
-                        question_data.student_answer += line + "\n";
+                        question_data.student_answer = `$$${line}$$`;
                     } else if (current_section === "mistakes" && line.startsWith("-")) {
                         const mistake = line.slice(1).trim();
                         if (mistake && !mistake.toLowerCase().includes("no mistakes")) {
                             question_data.mistakes.push(mistake);
                         }
                     } else if (current_section === "corrected" && line) {
-                        question_data.corrected_solution += line + "\n";
+                        question_data.corrected_solution = `$$${line}$$`;
                     }
-                });
-                // Trim fields
-                ["question_text", "student_answer", "corrected_solution"].forEach(key => {
-                    if (question_data[key]) question_data[key] = question_data[key].trim();
                 });
                 if (!question_data.id) question_data.id = `Q${questions.length + 1}`;
                 questions.push(question_data);
             });
-            // Fallback if no questions parsed
             if (questions.length === 0) {
                 questions.push({
                     id: "Q1",
-                    question_text: "Error parsing analysis",
-                    student_answer: "",
+                    question_text: "$$\text{Error parsing analysis}$$",
+                    student_answer: "$$\text{No answer provided}$$",
                     mistakes: ["Analysis parsing failed"],
-                    corrected_solution: "",
+                    corrected_solution: "$$\text{No solution provided}$$",
                     is_correct: false
                 });
             }
@@ -424,21 +408,21 @@
                 <div class="accordion-content" id="content-${index}">
                     <div class="analysis-section">
                         <div class="section-title">Question</div>
-                        <div class="math-content">${question.question_text || 'No question text'}</div>
+                        <div class="math-content">${question.question_text}</div>
                     </div>
                     <div class="analysis-section">
                         <div class="section-title">Student's Answer</div>
-                        <div class="math-content">${question.student_answer || 'No answer provided'}</div>
+                        <div class="math-content">${question.student_answer}</div>
                     </div>
                     <div class="analysis-section">
                         <div class="section-title">Errors</div>
-                        ${question.mistakes.length ? 
-                            `<ul class="mistakes-list">${question.mistakes.map(m => `<li class="mistake-item">${m}</li>`).join('')}</ul>` : 
+                        ${question.mistakes.length ?
+                            `<ul class="mistakes-list">${question.mistakes.map(m => `<li class="mistake-item">${m}</li>`).join('')}</ul>` :
                             `<div class="math-content">No errors found</div>`}
                     </div>
                     <div class="analysis-section">
                         <div class="section-title">Corrected Solution</div>
-                        <div class="math-content">${question.corrected_solution || 'No corrected solution'}</div>
+                        <div class="math-content">${question.corrected_solution}</div>
                     </div>
                 </div>
             `;
