@@ -22,6 +22,8 @@ let currentUser = null;
 let questionFiles = [];
 let answerFiles = [];
 let analysisResults = null;
+let currentJobId = null;
+let websocket = null;
 
 // DOM Elements
 const loginPage = document.getElementById('login-page');
@@ -113,6 +115,9 @@ function loadDashboard() {
     
     // Setup event listeners
     setupDashboardEvents();
+    
+    // Initialize WebSocket connection
+    setupWebSocket();
 }
 
 // Setup dashboard event listeners
@@ -201,7 +206,7 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// Begin analysis
+// Begin analysis - REAL VERSION
 async function beginAnalysis() {
     if (questionFiles.length === 0 || answerFiles.length === 0) {
         alert('Please upload both question and answer files');
@@ -222,50 +227,134 @@ async function beginAnalysis() {
     progressFill.style.width = '0%';
     progressDetails.innerHTML = '';
     
-    // Simulate analysis process with streaming updates
-    await simulateAnalysisProcess();
+    try {
+        // 1. Upload files to backend
+        const uploadResult = await uploadFilesToBackend();
+        
+        if (uploadResult.success && uploadResult.job_id) {
+            currentJobId = uploadResult.job_id;
+            
+            // 2. Connect WebSocket and start analysis
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify({
+                    action: 'start_analysis',
+                    job_id: currentJobId
+                }));
+            } else {
+                throw new Error('WebSocket not connected');
+            }
+        } else {
+            throw new Error(uploadResult.error || 'Upload failed');
+        }
+    } catch (error) {
+        console.error('Analysis failed:', error);
+        addProgressUpdate(`Error: ${error.message}`, 'error');
+        progressText.textContent = 'Analysis failed';
+    }
 }
 
-// Simulate analysis with streaming updates
-async function simulateAnalysisProcess() {
-    const steps = [
-        { text: 'Processing uploaded files...', duration: 1000, progress: 10 },
-        { text: 'Extracting text from documents...', duration: 1500, progress: 25 },
-        { text: 'Identifying mathematical equations...', duration: 2000, progress: 40 },
-        { text: 'Analyzing question structure...', duration: 1500, progress: 55 },
-        { text: 'Evaluating student solutions...', duration: 2000, progress: 70 },
-        { text: 'Checking for mathematical errors...', duration: 1500, progress: 85 },
-        { text: 'Generating detailed analysis...', duration: 1000, progress: 100 }
-    ];
-    
-    for (const step of steps) {
-        progressText.textContent = step.text;
-        progressFill.style.width = step.progress + '%';
-        
-        // Add streaming update
-        const updateDiv = document.createElement('p');
-        updateDiv.textContent = step.text;
-        updateDiv.classList.add('success');
-        progressDetails.appendChild(updateDiv);
-        progressDetails.scrollTop = progressDetails.scrollHeight;
-        
-        // Wait for step duration
-        await wait(step.duration);
+// REAL file upload to backend
+async function uploadFilesToBackend() {
+    if (questionFiles.length === 0 || answerFiles.length === 0) {
+        return { success: false, error: 'No files selected' };
     }
     
-    // Complete analysis
-    progressText.textContent = 'Analysis complete!';
+    const formData = new FormData();
     
-    // Generate sample analysis results
-    analysisResults = generateSampleAnalysis();
+    // Add question files
+    questionFiles.forEach((fileObj, index) => {
+        formData.append('question_files', fileObj.file);
+    });
     
-    // Show results after delay
-    await wait(1000);
-    progressSection.style.display = 'none';
-    resultsSection.style.display = 'block';
+    // Add answer files
+    answerFiles.forEach((fileObj, index) => {
+        formData.append('answer_files', fileObj.file);
+    });
     
-    // Update stats
-    totalQuestions.textContent = `${analysisResults.questions.length} questions analyzed`;
+    // Add analysis sheet info
+    formData.append('analysis_sheet', analysisSheet.value);
+    
+    try {
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        console.log('Upload result:', result);
+        return result;
+        
+    } catch (error) {
+        console.error('Upload error:', error);
+        return { success: false, error: 'Failed to upload files' };
+    }
+}
+
+// Setup WebSocket connection
+function setupWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    websocket = new WebSocket(wsUrl);
+    
+    websocket.onopen = () => {
+        console.log('WebSocket connected to', wsUrl);
+        addProgressUpdate('Connected to analysis server', 'success');
+    };
+    
+    websocket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+        } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+        }
+    };
+    
+    websocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        addProgressUpdate('Connection error', 'error');
+    };
+    
+    websocket.onclose = () => {
+        console.log('WebSocket disconnected');
+        addProgressUpdate('Disconnected from server', 'warning');
+        // Try to reconnect after 3 seconds
+        setTimeout(setupWebSocket, 3000);
+    };
+}
+
+// Handle WebSocket messages
+function handleWebSocketMessage(data) {
+    console.log('WebSocket message:', data);
+    
+    if (data.type === 'progress') {
+        progressText.textContent = data.message;
+        progressFill.style.width = data.progress + '%';
+        addProgressUpdate(data.message, 'success');
+    } 
+    else if (data.type === 'result') {
+        analysisResults = data.data;
+        progressSection.style.display = 'none';
+        resultsSection.style.display = 'block';
+        totalQuestions.textContent = `${analysisResults.questions.length} questions analyzed`;
+        
+        // Auto-show detailed analysis
+        showDetailedAnalysis();
+    } 
+    else if (data.type === 'error') {
+        addProgressUpdate(`Error: ${data.message}`, 'error');
+        progressText.textContent = 'Analysis failed';
+    }
+}
+
+// Add progress update to UI
+function addProgressUpdate(message, type = 'info') {
+    const updateDiv = document.createElement('p');
+    updateDiv.textContent = message;
+    updateDiv.classList.add(type);
+    progressDetails.appendChild(updateDiv);
+    progressDetails.scrollTop = progressDetails.scrollHeight;
 }
 
 // Wait function
@@ -273,66 +362,6 @@ function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Generate sample analysis data
-function generateSampleAnalysis() {
-    return {
-        sheetName: analysisSheet.options[analysisSheet.selectedIndex].text,
-        questions: [
-            {
-                id: 'Q1',
-                number: '1(a)',
-                originalQuestion: 'Evaluate $\\int (3x^2 + 2x + 1) \\, dx$',
-                studentAnswer: '$\\int (3x^2 + 2x + 1) \\, dx = x^3 + x^2 + x$',
-                correctAnswer: '$\\int (3x^2 + 2x + 1) \\, dx = x^3 + x^2 + x + C$',
-                mistakes: ['Missing constant of integration (C)'],
-                isCorrect: false,
-                explanation: 'When evaluating indefinite integrals, always include the constant of integration.'
-            },
-            {
-                id: 'Q2',
-                number: '1(b)',
-                originalQuestion: 'Find $\\frac{d}{dx}(\\sin(x^2))$',
-                studentAnswer: '$\\frac{d}{dx}(\\sin(x^2)) = \\cos(x^2)$',
-                correctAnswer: '$\\frac{d}{dx}(\\sin(x^2)) = 2x\\cos(x^2)$',
-                mistakes: ['Incorrect application of chain rule'],
-                isCorrect: false,
-                explanation: 'Apply chain rule: $\\frac{d}{dx}\\sin(f(x)) = f\'(x)\\cos(f(x))$'
-            },
-            {
-                id: 'Q3',
-                number: '2',
-                originalQuestion: 'Solve $\\frac{d^2y}{dx^2} - 3\\frac{dy}{dx} + 2y = 0$',
-                studentAnswer: '$y = Ae^x + Be^{2x}$',
-                correctAnswer: '$y = Ae^x + Be^{2x}$',
-                mistakes: [],
-                isCorrect: true,
-                explanation: 'Correct solution to the homogeneous second-order differential equation.'
-            },
-            {
-                id: 'Q4',
-                number: '3(a)',
-                originalQuestion: 'Evaluate $\\lim_{x \\to 0} \\frac{\\sin(3x)}{x}$',
-                studentAnswer: '$\\lim_{x \\to 0} \\frac{\\sin(3x)}{x} = 1$',
-                correctAnswer: '$\\lim_{x \\to 0} \\frac{\\sin(3x)}{x} = 3$',
-                mistakes: ['Forgot to multiply by 3 from the angle'],
-                isCorrect: false,
-                explanation: 'Using limit identity: $\\lim_{x \\to 0} \\frac{\\sin(kx)}{x} = k$'
-            },
-            {
-                id: 'Q5',
-                number: '4',
-                originalQuestion: 'Find the area between $y = x^2$ and $y = x$ from $x = 0$ to $x = 1$',
-                studentAnswer: 'Area = $\\int_0^1 (x - x^2) dx = \\frac{1}{6}$',
-                correctAnswer: 'Area = $\\int_0^1 (x - x^2) dx = \\frac{1}{6}$',
-                mistakes: [],
-                isCorrect: true,
-                explanation: 'Correct application of area between curves formula.'
-            }
-        ]
-    };
-}
-
-// Show detailed analysis
 // Show detailed analysis
 function showDetailedAnalysis() {
     if (!analysisResults) {
@@ -361,7 +390,7 @@ function showDetailedAnalysis() {
                     <div class="section-title">Student's Answer</div>
                     <div class="math-content">${question.studentAnswer}</div>
                     
-                    ${!question.isCorrect ? `
+                    ${!question.isCorrect && question.mistakes && question.mistakes.length > 0 ? `
                         <div class="section-title">Mathematical Errors Found</div>
                         <ul class="mistakes-list">
                             ${question.mistakes.map(mistake => `
@@ -379,21 +408,14 @@ function showDetailedAnalysis() {
     
     analysisResultsDiv.classList.add('active');
     
-    // FORCE MathJax to render - FIXED!
+    // Force MathJax to render
     if (window.MathJax) {
-        MathJax.typesetPromise([analysisResultsDiv]).then(() => {
-            console.log('MathJax rendering complete');
-        }).catch((err) => {
+        MathJax.typesetPromise([analysisResultsDiv]).catch(err => {
             console.error('MathJax rendering error:', err);
-            // Try again after a short delay
-            setTimeout(() => {
-                if (window.MathJax) {
-                    MathJax.typesetPromise([analysisResultsDiv]);
-                }
-            }, 500);
         });
     }
 }
+
 // Show generate paper modal
 function showGeneratePaperModal() {
     if (!analysisResults) {
@@ -402,8 +424,13 @@ function showGeneratePaperModal() {
     }
     
     // Populate question selector
-    questionSelectorList.innerHTML = analysisResults.questions
-        .filter(q => !q.isCorrect) // Only show incorrect questions
+    const incorrectQuestions = analysisResults.questions.filter(q => !q.isCorrect);
+    if (incorrectQuestions.length === 0) {
+        alert('No incorrect questions to redesign!');
+        return;
+    }
+    
+    questionSelectorList.innerHTML = incorrectQuestions
         .map(question => `
             <label class="question-checkbox">
                 <input type="checkbox" value="${question.id}" checked>
@@ -445,7 +472,7 @@ function generatePreview() {
 
 // Generate redesigned question
 function generateRedesignedQuestion(question) {
-    const original = question.originalQuestion;
+    const original = question.originalQuestion || '';
     
     // Simple redesign by changing coefficients/variables
     if (original.includes('\\int')) {
@@ -466,12 +493,14 @@ function generateRedesignedQuestion(question) {
         return original
             .replace('3', '5')
             .replace('2', '4')
-            .replace('1', '3');
+            .replace('1', '3')
+            .replace('x', 't')
+            .replace('y', 'z');
     }
 }
 
 // Generate practice paper
-function generatePracticePaper() {
+async function generatePracticePaper() {
     const selectedIds = Array.from(
         document.querySelectorAll('.question-checkbox input:checked')
     ).map(input => input.value);
@@ -485,33 +514,35 @@ function generatePracticePaper() {
         return;
     }
     
-    // Create practice paper content
-    let paperContent = `Practice Paper - ${analysisResults.sheetName}\n\n`;
-    paperContent += '='.repeat(50) + '\n\n';
-    
-    selectedQuestions.forEach((question, index) => {
-        paperContent += `${index + 1}. ${generateRedesignedQuestion(question)}\n\n`;
-        paperContent += `   Based on original question: ${question.number}\n`;
-        paperContent += `   Student error: ${question.mistakes[0]}\n\n`;
-        paperContent += '   Space for solution:\n\n'.repeat(3);
-          paperContent += '-'.repeat(50) + '\n\n';
-    });
-    
-    // Create and download file
-    const blob = new Blob([paperContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Practice_Paper_${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    // Close modal
-    generatePaperModal.style.display = 'none';
-    
-    alert('Practice paper downloaded successfully!');
+    try {
+        const response = await fetch('/api/generate-paper', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                job_id: currentJobId,
+                question_ids: selectedIds
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Download the file
+            window.location.href = result.download_url;
+            
+            // Close modal
+            generatePaperModal.style.display = 'none';
+            
+            alert('Practice paper downloaded successfully!');
+        } else {
+            alert(`Error: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Paper generation error:', error);
+        alert('Failed to generate practice paper');
+    }
 }
 
 // Show specific page
@@ -527,6 +558,11 @@ function showPage(pageId) {
 
 // Handle logout
 function handleLogout() {
+    // Close WebSocket if open
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.close();
+    }
+    
     currentUser = null;
     localStorage.removeItem('math_ocr_user');
     showPage('login-page');
@@ -539,6 +575,7 @@ function handleLogout() {
     questionFiles = [];
     answerFiles = [];
     analysisResults = null;
+    currentJobId = null;
     questionFileList.innerHTML = '<p>No files selected</p>';
     answerFileList.innerHTML = '<p>No files selected</p>';
     analysisSheet.value = '';
@@ -550,9 +587,9 @@ function handleLogout() {
 
 // Handle page visibility
 function handleVisibilityChange() {
-    if (!document.hidden && currentUser) {
+    if (!document.hidden && currentUser && window.MathJax) {
         // Refresh MathJax when page becomes visible
-        if (window.MathJax && analysisResultsDiv.classList.contains('active')) {
+        if (analysisResultsDiv.classList.contains('active')) {
             MathJax.typesetPromise([analysisResultsDiv]);
         }
     }
@@ -561,97 +598,7 @@ function handleVisibilityChange() {
 // Initialize visibility handler
 document.addEventListener('visibilitychange', handleVisibilityChange);
 
-// Real file upload to backend (for actual implementation)
-async function uploadFilesToBackend() {
-    if (questionFiles.length === 0 || answerFiles.length === 0) {
-        return false;
-    }
-    
-    const formData = new FormData();
-    
-    // Add question files
-    questionFiles.forEach((fileObj, index) => {
-        formData.append('question_files', fileObj.file);
-    });
-    
-    // Add answer files
-    answerFiles.forEach((fileObj, index) => {
-        formData.append('answer_files', fileObj.file);
-    });
-    
-    // Add analysis sheet info
-    formData.append('analysis_sheet', analysisSheet.value);
-    
-    try {
-        // This is where you would make the actual API call
-        // const response = await fetch('/api/analyze', {
-        //     method: 'POST',
-        //     body: formData
-        // });
-        
-        // For now, we'll use the simulated version
-        return true;
-    } catch (error) {
-        console.error('Upload error:', error);
-        alert('Failed to upload files. Please try again.');
-        return false;
-    }
-}
-
-// Real-time WebSocket connection for streaming analysis
-function setupWebSocket() {
-    // This would be implemented for real-time updates
-    const ws = new WebSocket('ws://localhost:8000/ws');
-    
-    ws.onopen = () => {
-        console.log('WebSocket connected');
-    };
-    
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        handleWebSocketMessage(data);
-    };
-    
-    ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-    };
-    
-    ws.onclose = () => {
-        console.log('WebSocket disconnected');
-    };
-}
-
-// Handle WebSocket messages
-function handleWebSocketMessage(data) {
-    if (data.type === 'progress') {
-        progressText.textContent = data.message;
-        progressFill.style.width = data.progress + '%';
-        
-        const updateDiv = document.createElement('p');
-        updateDiv.textContent = data.message;
-        updateDiv.classList.add('success');
-        progressDetails.appendChild(updateDiv);
-        progressDetails.scrollTop = progressDetails.scrollHeight;
-    } else if (data.type === 'result') {
-        analysisResults = data.data;
-        progressSection.style.display = 'none';
-        resultsSection.style.display = 'block';
-        totalQuestions.textContent = `${analysisResults.questions.length} questions analyzed`;
-    } else if (data.type === 'error') {
-        const errorDiv = document.createElement('p');
-        errorDiv.textContent = `Error: ${data.message}`;
-        errorDiv.classList.add('error');
-        progressDetails.appendChild(errorDiv);
-        progressDetails.scrollTop = progressDetails.scrollHeight;
-    }
-}
-
-// Initialize WebSocket on dashboard load
-if (dashboardPage.classList.contains('active')) {
-    // setupWebSocket(); // Uncomment for real WebSocket implementation
-}
-
-// Additional helper functions
+// Debounce function for resize events
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -666,36 +613,10 @@ function debounce(func, wait) {
 
 // Handle window resize
 window.addEventListener('resize', debounce(() => {
-    // Re-render MathJax on resize
     if (window.MathJax && analysisResultsDiv.classList.contains('active')) {
         MathJax.typesetPromise([analysisResultsDiv]);
     }
 }, 250));
-
-// Prevent form submission on enter in inputs
-document.querySelectorAll('input').forEach(input => {
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && input.type !== 'submit') {
-            e.preventDefault();
-        }
-    });
-});
-
-// Enhanced error handling
-window.addEventListener('error', (event) => {
-    console.error('Global error:', event.error);
-    // You could send this to an error tracking service
-});
-
-// Unload handler
-window.addEventListener('beforeunload', (event) => {
-    if (progressSection.style.display === 'block') {
-        // Warn user if analysis is in progress
-        event.preventDefault();
-        event.returnValue = 'Analysis is in progress. Are you sure you want to leave?';
-        return event.returnValue;
-    }
-});
 
 // Initialize MathJax typesetting for dynamic content
 function refreshMathJax() {
@@ -710,6 +631,12 @@ window.showDetailedAnalysis = showDetailedAnalysis;
 window.showGeneratePaperModal = showGeneratePaperModal;
 window.generatePracticePaper = generatePracticePaper;
 
-
-
-        
+// Style for progress messages
+const style = document.createElement('style');
+style.textContent = `
+    .success { color: #10b981; }
+    .error { color: #ef4444; }
+    .warning { color: #f59e0b; }
+    .info { color: #3b82f6; }
+`;
+document.head.appendChild(style);
