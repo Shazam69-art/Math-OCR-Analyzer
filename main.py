@@ -48,7 +48,8 @@ async def serve_index():
 
 @app.get("/style.css")
 async def serve_css():
-    return FileResponse("style.css")
+    return FileResponse("style.css", media_type="text/css")
+
 
 @app.post("/upload-question")
 async def upload_question(files: List[UploadFile] = File(...)):
@@ -263,3 +264,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
