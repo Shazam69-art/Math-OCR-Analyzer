@@ -3,450 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Math Analyzer</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            font-weight: 600;
-        }
-
-        .header p {
-            font-size: 1.1rem;
-            opacity: 0.9;
-        }
-
-        .main-content {
-            padding: 30px;
-        }
-
-        .upload-section {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 40px;
-        }
-
-        @media (max-width: 768px) {
-            .upload-section {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .upload-box {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 25px;
-            border: 2px dashed #dee2e6;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .upload-box:hover {
-            border-color: #667eea;
-            background: #f0f2ff;
-        }
-
-        .upload-box.active {
-            border-color: #28a745;
-            background: #f0fff4;
-        }
-
-        .upload-icon {
-            font-size: 3rem;
-            margin-bottom: 15px;
-            display: block;
-        }
-
-        .upload-btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 50px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 15px;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .upload-btn:hover {
-            background: #5a67d8;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        .upload-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .file-info {
-            margin-top: 15px;
-            font-size: 0.9rem;
-            color: #666;
-        }
-
-        .file-count {
-            background: #667eea;
-            color: white;
-            border-radius: 50%;
-            width: 25px;
-            height: 25px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-            margin-left: 5px;
-        }
-
-        .analyze-section {
-            text-align: center;
-            margin: 40px 0;
-        }
-
-        .analyze-btn {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            border: none;
-            padding: 16px 40px;
-            border-radius: 50px;
-            font-size: 1.2rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 15px;
-            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.2);
-        }
-
-        .analyze-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(40, 167, 69, 0.3);
-        }
-
-        .analyze-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .analyze-icon {
-            font-size: 1.4rem;
-        }
-
-        .results-section {
-            display: none;
-        }
-
-        .results-header {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .question-accordion {
-            margin-bottom: 20px;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-        }
-
-        .accordion-header {
-            background: #667eea;
-            color: white;
-            padding: 20px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 600;
-            font-size: 1.1rem;
-        }
-
-        .accordion-header:hover {
-            background: #5a67d8;
-        }
-
-        .status-badge {
-            background: white;
-            color: #667eea;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-
-        .status-badge.correct {
-            background: #28a745;
-            color: white;
-        }
-
-        .status-badge.incorrect {
-            background: #dc3545;
-            color: white;
-        }
-
-        .accordion-content {
-            background: white;
-            padding: 0;
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-        }
-
-        .accordion-content.open {
-            max-height: 2000px;
-        }
-
-        .analysis-section {
-            padding: 25px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .analysis-section:last-child {
-            border-bottom: none;
-        }
-
-        .section-title {
-            color: #667eea;
-            margin-bottom: 15px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .section-icon {
-            font-size: 1.2rem;
-        }
-
-        .math-content {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            font-family: 'Cambria Math', 'Times New Roman', serif;
-            font-size: 1.1rem;
-            line-height: 1.8;
-            min-height: 50px;
-        }
-
-        .mistakes-list {
-            list-style: none;
-        }
-
-        .mistake-item {
-            background: #fff5f5;
-            border-left: 4px solid #dc3545;
-            padding: 12px 15px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-            color: #721c24;
-        }
-
-        .reanalyze-section {
-            background: #f0f8ff;
-            padding: 25px;
-            border-top: 1px solid #dee2e6;
-        }
-
-        .feedback-input {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #dee2e6;
-            border-radius: 8px;
-            font-size: 1rem;
-            margin-bottom: 15px;
-            resize: vertical;
-            min-height: 100px;
-            font-family: inherit;
-        }
-
-        .feedback-input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .reanalyze-btn {
-            background: #17a2b8;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 50px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .reanalyze-btn:hover {
-            background: #138496;
-            transform: translateY(-2px);
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 40px;
-        }
-
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .error-message {
-            background: #fff5f5;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border-left: 4px solid #dc3545;
-            display: none;
-        }
-
-        .success-message {
-            background: #f0fff4;
-            color: #155724;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border-left: 4px solid #28a745;
-            display: none;
-        }
-    </style>
+    <title>Math OCR Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- MathJax for proper math rendering -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Math Analyzer</h1>
-            <p>Upload your questions and answers for detailed analysis</p>
+    <!-- Login Page -->
+    <div id="login-page" class="page active">
+        <div class="login-container">
+            <div class="login-header">
+                <h1>Math OCR Analyzer</h1>
+                <p>AI-Powered Mathematical Analysis System</p>
+            </div>
+            
+            <div class="login-box">
+                <h2>Welcome Back</h2>
+                <p class="login-subtitle">Sign in to access your math analysis dashboard</p>
+                
+                <div class="social-login">
+                    <button class="social-btn google-btn" id="google-login">
+                        <i class="fab fa-google"></i>
+                        Continue with Google
+                    </button>
+                    <button class="social-btn apple-btn" id="apple-login">
+                        <i class="fab fa-apple"></i>
+                        Continue with Apple
+                    </button>
+                </div>
+                
+                <div class="divider">
+                    <span>or</span>
+                </div>
+                
+                <form class="login-form">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" placeholder="Enter your email" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" placeholder="Enter your password" required>
+                    </div>
+                    
+                    <div class="form-options">
+                        <label class="remember-me">
+                            <input type="checkbox" id="remember">
+                            <span class="checkmark"></span>
+                            Remember me
+                        </label>
+                        <a href="#" class="forgot-password">Forgot password?</a>
+                    </div>
+                    
+                    <button type="submit" class="login-btn">Sign In</button>
+                </form>
+                
+                <div class="signup-link">
+                    <p>Don't have an account? <a href="#">Contact administrator</a></p>
+                </div>
+            </div>
+            
+            <div class="login-footer">
+                <p>&copy; 2024 Math OCR Analyzer. All rights reserved.</p>
+            </div>
         </div>
+    </div>
 
-        <div class="main-content">
-            <!-- Upload Section -->
-            <div class="upload-section">
-                <div class="upload-box" id="questionBox">
-                    <span class="upload-icon">📄</span>
-                    <h3>Upload Questions</h3>
-                    <p>Upload question paper (PDF or image)</p>
-                    <button class="upload-btn" id="uploadQuestionBtn">
-                        <span>Choose Files</span>
-                    </button>
-                    <input type="file" id="questionInput" multiple accept=".pdf,.jpg,.jpeg,.png" style="display: none;">
-                    <div class="file-info" id="questionInfo">
-                        <span id="questionCount">0 files selected</span>
+    <!-- Main Dashboard -->
+    <div id="dashboard-page" class="page">
+        <div class="dashboard-container">
+            <header class="dashboard-header">
+                <div class="header-left">
+                    <h1>Math Analysis Dashboard</h1>
+                    <p>Welcome back, <span id="user-name">User</span></p>
+                </div>
+                <div class="header-right">
+                    <div class="user-menu">
+                        <div class="user-info">
+                            <span class="user-name" id="dashboard-user-name">User</span>
+                            <span class="user-role">Math Analyst</span>
+                        </div>
+                        <div class="user-avatar">
+                            <i class="fas fa-user-graduate"></i>
+                        </div>
+                        <button class="logout-btn" id="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <!-- File Upload Section -->
+                <div class="upload-section">
+                    <div class="upload-card">
+                        <div class="upload-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <h3>Upload Questions</h3>
+                        <p>Upload question paper (PDF or images)</p>
+                        <input type="file" id="question-upload" accept=".pdf,.jpg,.jpeg,.png" multiple style="display: none;">
+                        <button class="upload-btn" id="upload-question-btn">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            Choose Files
+                        </button>
+                        <div class="file-list" id="question-file-list">
+                            <p>No files selected</p>
+                        </div>
+                    </div>
+                    
+                    <div class="upload-card">
+                        <div class="upload-icon">
+                            <i class="fas fa-pencil-alt"></i>
+                        </div>
+                        <h3>Upload Answers</h3>
+                        <p>Upload student solutions (PDF or images)</p>
+                        <input type="file" id="answer-upload" accept=".pdf,.jpg,.jpeg,.png" multiple style="display: none;">
+                        <button class="upload-btn" id="upload-answer-btn">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            Choose Files
+                        </button>
+                        <div class="file-list" id="answer-file-list">
+                            <p>No files selected</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="upload-box" id="answerBox">
-                    <span class="upload-icon">✍️</span>
-                    <h3>Upload Answers</h3>
-                    <p>Upload your solutions (PDF or image)</p>
-                    <button class="upload-btn" id="uploadAnswerBtn">
-                        <span>Choose Files</span>
+                <!-- Analysis Selection -->
+                <div class="analysis-controls">
+                    <div class="analysis-select">
+                        <label for="analysis-sheet">Analysis Sheet:</label>
+                        <select id="analysis-sheet">
+                            <option value="">Select analysis sheet</option>
+                            <option value="integration">Math 12 - Integration - Substitution & Basic Questions of Special Formulas</option>
+                            <option value="calculus">Math 12 - Calculus - Differentiation & Applications</option>
+                            <option value="algebra">Math 12 - Algebra - Equations & Functions</option>
+                        </select>
+                    </div>
+                    
+                    <button class="primary-btn" id="begin-analysis-btn" disabled>
+                        <i class="fas fa-play"></i>
+                        Begin Analysis
                     </button>
-                    <input type="file" id="answerInput" multiple accept=".pdf,.jpg,.jpeg,.png" style="display: none;">
-                    <div class="file-info" id="answerInfo">
-                        <span id="answerCount">0 files selected</span>
+                </div>
+
+                <!-- Progress Section -->
+                <div class="progress-section" id="progress-section" style="display: none;">
+                    <div class="progress-card">
+                        <h3>Analysis in Progress</h3>
+                        <p id="progress-text">Initializing analysis...</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="progress-details" id="progress-details">
+                            <!-- Live streaming updates will appear here -->
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Analyze Button -->
-            <div class="analyze-section">
-                <button class="analyze-btn" id="analyzeBtn" disabled>
-                    <span class="analyze-icon">🔍</span>
-                    <span>Analyze Answers</span>
-                </button>
-            </div>
-
-            <!-- Loading -->
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <p>Analyzing your work...</p>
-                <p>This may take a moment.</p>
-            </div>
-
-            <!-- Error Message -->
-            <div class="error-message" id="errorMessage"></div>
-
-            <!-- Success Message -->
-            <div class="success-message" id="successMessage"></div>
-
-            <!-- Results Section -->
-            <div class="results-section" id="resultsSection">
-                <div class="results-header">
-                    <h2>Analysis Results</h2>
-                    <div id="totalQuestions">0 questions analyzed</div>
+                <!-- Results Section -->
+                <div class="results-section" id="results-section" style="display: none;">
+                    <div class="results-header">
+                        <h2>Analysis Results</h2>
+                        <div class="result-stats">
+                            <span id="total-questions">0 questions analyzed</span>
+                        </div>
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <button class="action-btn detailed-btn" id="detailed-analysis-btn">
+                            <i class="fas fa-chart-bar"></i>
+                            Detailed Analysis
+                        </button>
+                        <button class="action-btn generate-btn" id="generate-paper-btn">
+                            <i class="fas fa-file-contract"></i>
+                            Generate Question Paper
+                        </button>
+                    </div>
+                    
+                    <div class="analysis-results" id="analysis-results">
+                        <!-- Detailed analysis will be loaded here -->
+                    </div>
                 </div>
 
-                <div id="questionsContainer">
-                    <!-- Questions will be inserted here -->
+                <!-- Generate Paper Modal -->
+                <div class="modal" id="generate-paper-modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Generate Practice Paper</h3>
+                            <button class="close-modal" id="close-modal">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="question-selector">
+                                <h4>Select Questions to Redesign</h4>
+                                <div class="question-list" id="question-selector-list">
+                                    <!-- Questions will be populated here -->
+                                </div>
+                            </div>
+                            
+                            <div class="redesign-preview" id="redesign-preview">
+                                <h4>Redesigned Questions Preview</h4>
+                                <div class="preview-content" id="preview-content">
+                                    <!-- Redesigned questions will appear here -->
+                                </div>
+                            </div>
+                            
+                            <button class="primary-btn full-width" id="generate-final-btn">
+                                <i class="fas fa-download"></i>
+                                Download Practice Paper
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- MathJax Configuration -->
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="script.js"></script>
     <script>
-        MathJax = {
+        // Initialize MathJax
+        window.MathJax = {
             tex: {
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
                 displayMath: [['$$', '$$'], ['\\[', '\\]']],
@@ -455,397 +235,8 @@
             },
             options: {
                 skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
-            },
-            startup: {
-                pageReady: () => {
-                    return MathJax.startup.defaultPageReady().then(() => {
-                        console.log('MathJax initialized');
-                    });
-                }
             }
         };
     </script>
-
- <script>
-        // State
-        let questionFiles = [];
-        let answerFiles = [];
-        let analysisData = null;
-
-        // DOM Elements
-        const questionInput = document.getElementById('questionInput');
-        const answerInput = document.getElementById('answerInput');
-        const uploadQuestionBtn = document.getElementById('uploadQuestionBtn');
-        const uploadAnswerBtn = document.getElementById('uploadAnswerBtn');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const loading = document.getElementById('loading');
-        const errorMessage = document.getElementById('errorMessage');
-        const successMessage = document.getElementById('successMessage');
-        const resultsSection = document.getElementById('resultsSection');
-        const questionsContainer = document.getElementById('questionsContainer');
-        const totalQuestions = document.getElementById('totalQuestions');
-
-        // Event Listeners
-        uploadQuestionBtn.addEventListener('click', () => questionInput.click());
-        uploadAnswerBtn.addEventListener('click', () => answerInput.click());
-
-        questionInput.addEventListener('change', async (e) => {
-            const files = Array.from(e.target.files);
-            await uploadFiles(files, 'question');
-        });
-
-        answerInput.addEventListener('change', async (e) => {
-            const files = Array.from(e.target.files);
-            await uploadFiles(files, 'answer');
-        });
-
-        analyzeBtn.addEventListener('click', analyzeAnswers);
-
-        // Upload files
-        async function uploadFiles(files, type) {
-            if (!files.length) {
-                showError('Please select at least one file');
-                return;
-            }
-
-            const formData = new FormData();
-            files.forEach(file => formData.append('files', file));
-
-            try {
-                showLoading(`${type === 'question' ? 'Question' : 'Answer'} files uploading...`);
-                
-                const response = await fetch(`/upload-${type}`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    if (type === 'question') {
-                        questionFiles = files;
-                        document.getElementById('questionCount').textContent = `${files.length} file(s) selected`;
-                        document.getElementById('questionBox').classList.add('active');
-                        showSuccess('Questions uploaded successfully');
-                    } else {
-                        answerFiles = files;
-                        document.getElementById('answerCount').textContent = `${files.length} file(s) selected`;
-                        document.getElementById('answerBox').classList.add('active');
-                        showSuccess('Answers uploaded successfully');
-                    }
-                    checkAnalyzeButton();
-                } else {
-                    showError(data.error || 'Upload failed');
-                }
-            } catch (error) {
-                console.error('Upload error:', error);
-                showError('Upload failed: ' + error.message);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // Show loading
-        function showLoading(message = 'Processing...') {
-            loading.style.display = 'block';
-            if (message) {
-                loading.querySelector('p').textContent = message;
-            }
-        }
-
-        // Hide loading
-        function hideLoading() {
-            loading.style.display = 'none';
-        }
-
-        // Check if analyze button should be enabled
-        function checkAnalyzeButton() {
-            analyzeBtn.disabled = !(questionFiles.length > 0 && answerFiles.length > 0);
-        }
-
-        // Show error message
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.style.display = 'block';
-            successMessage.style.display = 'none';
-            setTimeout(() => {
-                errorMessage.style.display = 'none';
-            }, 5000);
-        }
-
-        // Show success message
-        function showSuccess(message) {
-            successMessage.textContent = message;
-            successMessage.style.display = 'block';
-            errorMessage.style.display = 'none';
-            setTimeout(() => {
-                successMessage.style.display = 'none';
-            }, 3000);
-        }
-
-        // Analyze answers
-        async function analyzeAnswers() {
-            if (!questionFiles.length || !answerFiles.length) {
-                showError('Please upload both questions and answers');
-                return;
-            }
-
-            showLoading('Analyzing your work...');
-            resultsSection.style.display = 'none';
-            errorMessage.style.display = 'none';
-
-            try {
-                // Call the CORRECT endpoint: /analyze (not /analyze-chat)
-                const response = await fetch('/analyze', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    analysisData = data.questions;
-                    displayResults(analysisData);
-                    showSuccess('Analysis complete!');
-                } else {
-                    showError(data.error || 'Analysis failed');
-                }
-            } catch (error) {
-                console.error('Analysis error:', error);
-                showError('Analysis failed: ' + error.message);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // Display results
-        function displayResults(questions) {
-            questionsContainer.innerHTML = '';
-            totalQuestions.textContent = `${questions.length} question(s) analyzed`;
-
-            questions.forEach((q, index) => {
-                const accordion = createQuestionAccordion(q, index);
-                questionsContainer.appendChild(accordion);
-            });
-
-            resultsSection.style.display = 'block';
-            
-            // Typeset MathJax after rendering
-            if (window.MathJax) {
-                setTimeout(() => {
-                    MathJax.typesetPromise();
-                }, 100);
-            }
-        }
-
-        // Create question accordion
-        function createQuestionAccordion(question, index) {
-            const accordion = document.createElement('div');
-            accordion.className = 'question-accordion';
-            accordion.innerHTML = `
-                <div class="accordion-header" onclick="toggleAccordion(${index})">
-                    <span>${question.id} - ${question.question_text ? question.question_text.substring(0, 50) : 'Question'}${question.question_text && question.question_text.length > 50 ? '...' : ''}</span>
-                    <span class="status-badge ${question.is_correct ? 'correct' : 'incorrect'}">
-                        ${question.is_correct ? '✓ Correct' : '✗ Needs Review'}
-                    </span>
-                </div>
-                <div class="accordion-content" id="content-${index}">
-                    <!-- Question -->
-                    <div class="analysis-section">
-                        <div class="section-title">
-                            <span class="section-icon">📝</span>
-                            Question
-                        </div>
-                        <div class="math-content" id="question-${index}">
-                            ${formatMathContent(question.question_text) || 'No question text'}
-                        </div>
-                    </div>
-
-                    <!-- Student's Answer -->
-                    <div class="analysis-section">
-                        <div class="section-title">
-                            <span class="section-icon">✍️</span>
-                            Student's Answer (Exact)
-                        </div>
-                        <div class="math-content" id="student-${index}">
-                            ${formatMathContent(question.student_answer) || 'No answer provided'}
-                        </div>
-                    </div>
-
-                    <!-- Mistakes -->
-                    <div class="analysis-section">
-                        <div class="section-title">
-                            <span class="section-icon">🔍</span>
-                            Mistakes Found
-                        </div>
-                        ${question.mistakes && question.mistakes.length > 0 ? 
-                            `<ul class="mistakes-list">
-                                ${question.mistakes.map(mistake => `
-                                    <li class="mistake-item">${escapeHtml(mistake)}</li>
-                                `).join('')}
-                            </ul>` :
-                            `<div class="math-content">No mistakes found</div>`
-                        }
-                    </div>
-
-                    <!-- Corrected Solution -->
-                    <div class="analysis-section">
-                        <div class="section-title">
-                            <span class="section-icon">✅</span>
-                            Corrected Solution
-                        </div>
-                        <div class="math-content" id="corrected-${index}">
-                            ${formatMathContent(question.corrected_solution) || 'No corrected solution'}
-                        </div>
-                    </div>
-
-                    <!-- Reanalyze Section -->
-                    <div class="reanalyze-section">
-                        <div class="section-title">
-                            <span class="section-icon">🔄</span>
-                            Reanalyze This Question
-                        </div>
-                        <p>If you think the analysis is incorrect, provide feedback below:</p>
-                        <textarea class="feedback-input" id="feedback-${index}" 
-                                  placeholder="Describe what you think is wrong with the analysis..."></textarea>
-                        <button class="reanalyze-btn" onclick="reanalyzeQuestion(${index}, '${question.id}')">
-                            <span>🔄</span>
-                            <span>Reanalyze</span>
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            return accordion;
-        }
-
-        // Toggle accordion
-        window.toggleAccordion = function(index) {
-            const content = document.getElementById(`content-${index}`);
-            content.classList.toggle('open');
-            
-            // Typeset MathJax when opening
-            if (content.classList.contains('open') && window.MathJax) {
-                setTimeout(() => {
-                    MathJax.typesetPromise([content]);
-                }, 50);
-            }
-        };
-
-        // Reanalyze question
-        window.reanalyzeQuestion = async function(index, questionId) {
-            const question = analysisData[index];
-            const feedback = document.getElementById(`feedback-${index}`).value.trim();
-            
-            if (!feedback) {
-                showError('Please provide feedback for reanalysis');
-                return;
-            }
-
-            showLoading('Reanalyzing question...');
-
-            try {
-                const response = await fetch('/reanalyze-question', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        question_id: questionId,
-                        feedback: feedback,
-                        original_question: question
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    // Update the question data
-                    question.mistakes = data.updated_mistakes;
-                    question.corrected_solution = data.updated_solution;
-                    question.is_correct = data.is_correct;
-
-                    // Update the UI
-                    const contentDiv = document.getElementById(`content-${index}`);
-                    
-                    // Update mistakes
-                    const mistakesSection = contentDiv.querySelector('.mistakes-list');
-                    if (mistakesSection) {
-                        mistakesSection.innerHTML = 
-                            question.mistakes.map(m => `<li class="mistake-item">${escapeHtml(m)}</li>`).join('');
-                    } else {
-                        // Create mistakes list if it doesn't exist
-                        const section = contentDiv.querySelectorAll('.analysis-section')[2];
-                        section.innerHTML = `
-                            <div class="section-title">
-                                <span class="section-icon">🔍</span>
-                                Mistakes Found
-                            </div>
-                            ${question.mistakes.length > 0 ? 
-                                `<ul class="mistakes-list">
-                                    ${question.mistakes.map(m => `<li class="mistake-item">${escapeHtml(m)}</li>`).join('')}
-                                </ul>` :
-                                `<div class="math-content">No mistakes found</div>`
-                            }
-                        `;
-                    }
-                    
-                    // Update corrected solution
-                    document.getElementById(`corrected-${index}`).innerHTML = 
-                        formatMathContent(question.corrected_solution);
-                    
-                    // Update status badge
-                    const badge = contentDiv.parentElement.querySelector('.status-badge');
-                    badge.className = `status-badge ${question.is_correct ? 'correct' : 'incorrect'}`;
-                    badge.textContent = question.is_correct ? '✓ Correct' : '✗ Needs Review';
-
-                    // Clear feedback
-                    document.getElementById(`feedback-${index}`).value = '';
-                    
-                    // Typeset MathJax
-                    if (window.MathJax) {
-                        setTimeout(() => {
-                            MathJax.typesetPromise([contentDiv]);
-                        }, 100);
-                    }
-
-                    showSuccess('Question reanalyzed successfully');
-                } else {
-                    showError(data.error || 'Reanalysis failed');
-                }
-            } catch (error) {
-                console.error('Reanalysis error:', error);
-                showError('Reanalysis failed: ' + error.message);
-            } finally {
-                hideLoading();
-            }
-        };
-
-        // Format math content for MathJax
-        function formatMathContent(text) {
-            if (!text) return '';
-            
-            // Preserve line breaks
-            let formatted = escapeHtml(text).replace(/\n/g, '<br>');
-            
-            // Ensure MathJax delimiters are preserved
-            formatted = formatted.replace(/\\\[/g, '\\[').replace(/\\\]/g, '\\]');
-            formatted = formatted.replace(/\\\(/g, '\\(').replace(/\\\)/g, '\\)');
-            
-            return formatted;
-        }
-
-        // Helper function to escape HTML
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // Initialize
-        checkAnalyzeButton();
-    </script></body>
+</body>
 </html>
