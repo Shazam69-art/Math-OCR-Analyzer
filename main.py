@@ -13,16 +13,16 @@ from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.staticfiles import StaticFiles  # <-- Make sure this is imported
 from PIL import Image
 from pdf2image import convert_from_bytes
 import google.generativeai as genai
 
-# Configure logging - KEEP THIS!
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configure Gemini - Get API key directly from environment
+# Configure Gemini
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable is required")
@@ -31,7 +31,10 @@ model = genai.GenerativeModel("gemini-2.5-flash")
 
 app = FastAPI(title="Math OCR Analyzer")
 
-# CORS - KEEP THIS!
+# FIX: Serve static files from current directory
+app.mount("/", StaticFiles(directory=".", html=True), name="static")
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -530,4 +533,5 @@ async def cleanup_old_files():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
