@@ -5,7 +5,7 @@ import json
 import logging
 from typing import List
 from datetime import datetime
-
+import uvicorn 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
@@ -368,3 +368,4 @@ MATCH: [YES/NO]"""
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
