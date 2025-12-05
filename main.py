@@ -212,38 +212,48 @@ async def start_analysis(job_id: str, websocket: WebSocket):
         await send_progress(websocket, 40, "Analyzing student answers...")
         
         # System prompt for math analysis
-        system_prompt = """You are an expert math tutor analyzing student work. Follow these rules:
+     # System prompt for math analysis - UPDATED VERSION
+system_prompt = """CRITICAL: You are analyzing scanned math exam papers. You MUST follow these rules STRICTLY:
 
-1. Extract ALL questions with their exact numbers (e.g., "1(a)", "Q2", "Question 3").
-2. For each question, show the student's answer EXACTLY as written.
-3. Find mistakes in student's answer. Be specific and brief.
-4. Provide the correct solution with proper mathematical reasoning.
-5. Use MathJax formatting: $inline$ for inline, $$display$$ for display math.
-6. Always include constant of integration for indefinite integrals.
-7. Check for common errors: sign errors, missing steps, incorrect formulas.
+1. EXTRACT EVERY SINGLE QUESTION from the images. Do NOT miss any.
+2. Question numbers must be EXACT as shown (e.g., "1", "2(a)", "Q3", "Question 4").
+3. For each question, show student's answer EXACTLY as written - preserve all symbols, formatting.
+4. Find MATHEMATICAL errors only (not theoretical):
+   - Incorrect calculations
+   - Wrong formulas applied  
+   - Missing steps in solution
+   - Algebraic errors
+   - Arithmetic mistakes
+   - Sign errors
+   - Units/conversion errors
+5. Provide CORRECT SOLUTION with proper MathJax formatting:
+   - Use $...$ for inline math
+   - Use $$...$$ for display math
+   - Escape properly: \\int, \\frac, \\sqrt, \\sin, \\cos
+6. NO EXPLANATION SECTION - Only show: Original Question, Student's Answer, Mistakes, Correct Solution
+7. If student's answer is correct: Mark as "MATCH: YES" and still show correct solution.
+8. If you're unsure about a question, still include it with "Unable to analyze completely" in mistakes.
 
-Output format for EACH question:
+OUTPUT FORMAT FOR EACH QUESTION (strictly follow):
 ---
-QUESTION [NUMBER]:
-[Question text]
+QUESTION [EXACT_NUMBER_FROM_IMAGE]:
+[Question text in MathJax]
 
 STUDENT'S ANSWER:
-[Exact student answer]
+[Student's answer exactly as written in MathJax]
 
 MISTAKES:
-- [Error 1]
-- [Error 2]
+- [Mathematical error 1: e.g., "Incorrect: 2+2=5, Should be: 2+2=4"]
+- [Mathematical error 2]
 
 CORRECT SOLUTION:
-[Step-by-step solution]
-
-EXPLANATION:
-[Brief explanation of concepts]
+[Complete correct solution in MathJax]
 
 MATCH: [YES/NO]
 ---
 
-If student's answer is completely correct, output "MATCH: YES" and still provide the correct solution."""
+IMPORTANT: Analyze ALL visible questions. If there are multiple parts (a, b, c), treat each as separate.
+If student left blank, write "BLANK" as student answer and provide full solution."""
         
         await send_progress(websocket, 60, "Running AI analysis...")
         
@@ -533,5 +543,6 @@ async def cleanup_old_files():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
