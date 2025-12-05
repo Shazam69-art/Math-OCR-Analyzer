@@ -2,36 +2,32 @@ import os
 import base64
 import io
 import json
-import requests
+import logging
+from typing import List
+from datetime import datetime
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-import uvicorn
 from PIL import Image
 import pypdfium2 as pdfium
 import google.generativeai as genai
-from typing import List
-import logging
-from datetime import datetime
-import re
-from fastapi import Request
-from fastapi.responses import StreamingResponse
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Configure Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable is required")
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash")  # Changed to 1.5-flash for better compatibility
+model = genai.GenerativeModel("gemini-2.5-flash")
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = FastAPI(title="Math Analyzer")
 
-app = FastAPI(title="CAS Education Math OCR Analyzer API")
-
-# CORS configuration
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -43,40 +39,36 @@ app.add_middleware(
 # Mount static files
 app.mount("/static", StaticFiles(directory="."), name="static")
 
+# Store uploaded files temporarily
+question_files = []
+answer_files = []
+
 def pil_to_base64_png(im: Image.Image) -> str:
     """Convert PIL Image to base64 PNG string."""
     buf = io.BytesIO()
     im.save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
-def pdf_all_pages_to_png_b64(pdf_bytes: bytes, dpi: int = 150) -> list:
-    """Render ALL pages of a PDF to PNG and return list of base64 strings."""
+def pdf_all_pages_to_png_b64(pdf_bytes: bytes, max_pages: int = 3) -> list:
+    """Render PDF pages to PNG."""
     try:
         doc = pdfium.PdfDocument(io.BytesIO(pdf_bytes))
         if len(doc) == 0:
             return []
-        scale = dpi / 72.0
+        
         pages_b64 = []
-        for i in range(len(doc)):
+        pages_to_process = min(len(doc), max_pages)
+        scale = 150 / 72.0
+        
+        for i in range(pages_to_process):
             page = doc[i]
             bitmap = page.render(scale=scale).to_pil()
-            page_b64 = pil_to_base64_png(bitmap)
-            pages_b64.append(page_b64)
+            pages_b64.append(pil_to_base64_png(bitmap))
+        
         return pages_b64
     except Exception as e:
         logger.error(f"PDF processing error: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"PDF processing error: {str(e)}")
-
-async def process_uploaded_file(file: UploadFile) -> List[str]:
-    """Process uploaded file and return base64 encoded pages."""
-    content = await file.read()
-    if file.content_type == "application/pdf":
-        return pdf_all_pages_to_png_b64(content)
-    elif file.content_type.startswith("image/"):
-        image = Image.open(io.BytesIO(content))
-        return [pil_to_base64_png(image)]
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
+        return []
 
 @app.get("/")
 async def serve_index():
@@ -86,282 +78,293 @@ async def serve_index():
 async def serve_css():
     return FileResponse("style.css")
 
-@app.post("/analyze-chat")
-async def analyze_chat(
-        message: str = Form(""),
-        files: List[UploadFile] = File([])
-):
-    """Main analysis endpoint using Gemini with STREAMING to prevent timeout."""
+@app.post("/upload-question")
+async def upload_question(files: List[UploadFile] = File(...)):
+    """Upload question files."""
+    global question_files
     try:
-        logger.info(f"Analysis request - Message: {message[:100]}, Files: {len(files)}")
+        question_files = []
+        for file in files[:2]:  # Max 2 files
+            content = await file.read()
+            if file.content_type == "application/pdf":
+                pages = pdf_all_pages_to_png_b64(content, max_pages=2)
+                question_files.extend(pages[:2])  # Max 2 pages per file
+            elif file.content_type.startswith("image/"):
+                image = Image.open(io.BytesIO(content))
+                if image.size[0] > 800:
+                    image.thumbnail((800, 800))
+                question_files.append(pil_to_base64_png(image))
         
-        # Create a streaming response
-        async def generate():
-            try:
-                # Send initial status
-                yield json.dumps({"status": "processing", "progress": 10, "message": "Starting analysis..."}) + "\n"
-                
-                # Process files (OPTIMIZED - limit files and pages)
-                file_contents = []
-                file_descriptions = []
-                
-                # Limit to max 2 files to prevent timeout
-                files_to_process = files[:2]
-                
-                for file_idx, file in enumerate(files_to_process):
-                    yield json.dumps({
-                        "status": "processing", 
-                        "progress": 20 + (file_idx * 15), 
-                        "message": f"Processing {file.filename}..."
-                    }) + "\n"
-                    
-                    if file.content_type in ["application/pdf", "image/jpeg", "image/png", "image/jpg"]:
-                        content = await file.read()
-                        file_descriptions.append(f"Processed {file.filename}")
-                        
-                        if file.content_type == "application/pdf":
-                            pages = pdf_all_pages_to_png_b64(content)
-                            for page_b64 in pages[:2]:  # Limit to 2 pages
-                                file_contents.append({
-                                    "mime_type": "image/png",
-                                    "data": base64.b64decode(page_b64)
-                                })
-                        else:
-                            image = Image.open(io.BytesIO(content))
-                            if image.size[0] > 1000:
-                                image.thumbnail((1000, 1000))
-                            page_b64 = pil_to_base64_png(image)
-                            file_contents.append({
-                                "mime_type": "image/png",
-                                "data": base64.b64decode(page_b64)
-                            })
-                
-                # Send processing update
-                yield json.dumps({
-                    "status": "processing", 
-                    "progress": 60, 
-                    "message": "Sending to Gemini for analysis..."
-                }) + "\n"
-                
-                # Prepare content for Gemini
-                system_prompt = """Analyze math work. Output format:
+        return JSONResponse({
+            "success": True,
+            "count": len(question_files),
+            "message": f"Uploaded {len(files)} question file(s)"
+        })
+    except Exception as e:
+        logger.error(f"Upload error: {str(e)}")
+        return JSONResponse({
+            "success": False,
+            "error": f"Upload failed: {str(e)}"
+        }, status_code=500)
 
-Question [ID]:
-Question: [text]
-Student: [solution]
-Errors: [brief]
-Correct: [solution]
-
-Keep under 200 words."""
-                
-                user_prompt = f"User request: {message}\n\nAnalyze these math documents:"
-                
-                # Prepare the content for Gemini
-                contents = []
-                if file_contents:
-                    # Use only the first image to avoid timeouts
-                    contents = [user_prompt] + file_contents[:1]
-                else:
-                    contents = [user_prompt]
-                
-                # Get response from Gemini
-                response = model.generate_content(contents)
-                full_response = response.text
-                
-                # Parse detailed data
-                detailed_data = parse_detailed_data_improved(full_response)
-                
-                # Send completion
-                yield json.dumps({
-                    "status": "complete",
-                    "response": full_response,
-                    "detailed_data": detailed_data,
-                    "files_processed": file_descriptions,
-                    "progress": 100
-                }) + "\n"
-                
-            except Exception as e:
-                logger.error(f"Streaming analysis failed: {str(e)}")
-                yield json.dumps({
-                    "status": "error",
-                    "error": f"Analysis failed: {str(e)}",
-                    "progress": 0
-                }) + "\n"
+@app.post("/upload-answer")
+async def upload_answer(files: List[UploadFile] = File(...)):
+    """Upload answer files."""
+    global answer_files
+    try:
+        answer_files = []
+        for file in files[:2]:  # Max 2 files
+            content = await file.read()
+            if file.content_type == "application/pdf":
+                pages = pdf_all_pages_to_png_b64(content, max_pages=2)
+                answer_files.extend(pages[:2])  # Max 2 pages per file
+            elif file.content_type.startswith("image/"):
+                image = Image.open(io.BytesIO(content))
+                if image.size[0] > 800:
+                    image.thumbnail((800, 800))
+                answer_files.append(pil_to_base64_png(image))
         
-        # Return as streaming response
-        return StreamingResponse(
-            generate(),
-            media_type="application/x-ndjson",
-            headers={
-                "X-Accel-Buffering": "no",
-                "Cache-Control": "no-cache, no-transform"
-            }
-        )
+        return JSONResponse({
+            "success": True,
+            "count": len(answer_files),
+            "message": f"Uploaded {len(files)} answer file(s)"
+        })
+    except Exception as e:
+        logger.error(f"Upload error: {str(e)}")
+        return JSONResponse({
+            "success": False,
+            "error": f"Upload failed: {str(e)}"
+        }, status_code=500)
+
+@app.post("/analyze")
+async def analyze():
+    """Analyze uploaded files with Gemini."""
+    try:
+        if not question_files or not answer_files:
+            raise HTTPException(status_code=400, detail="Please upload both question and answer files")
+        
+        # Prepare images for Gemini
+        gemini_contents = []
+        
+        # Add question images
+        for i, img_b64 in enumerate(question_files[:2]):  # Max 2 question images
+            img_data = base64.b64decode(img_b64)
+            gemini_contents.append({
+                "mime_type": "image/png",
+                "data": img_data
+            })
+        
+        # Add answer images
+        for i, img_b64 in enumerate(answer_files[:2]):  # Max 2 answer images
+            img_data = base64.b64decode(img_b64)
+            gemini_contents.append({
+                "mime_type": "image/png",
+                "data": img_data
+            })
+        
+        # System prompt for Gemini
+        system_prompt = """You are a math tutor analyzing student work. Follow these rules STRICTLY:
+
+1. Extract ALL questions and their numbers EXACTLY as they appear (e.g., "1(a)", "Q2", "Question 3").
+2. For each question, show the student's answer EXACTLY as written. Preserve line breaks, symbols, everything. IGNORE strikethroughs.
+3. Find mistakes in student's answer. Be BRIEF and PRECISE - just state the error in 1 sentence.
+4. Provide your own CORRECTED solution. If student's answer matches yours (even with different steps), mark as correct.
+5. Use PERFECT MathJax formatting: $inline$ for inline, $$display$$ for display.
+6. Output format MUST BE:
+---
+QUESTION [EXACT_NUMBER]:
+[Question text in MathJax]
+
+STUDENT'S ANSWER:
+[Exact answer text in MathJax]
+
+MISTAKES:
+- [Brief error 1]
+- [Brief error 2] (or "No mistakes found" if correct)
+
+CORRECTED SOLUTION:
+[Your solution in MathJax]
+
+MATCH: [YES/NO]
+---
+"""
+        
+        # Get analysis from Gemini
+        response = model.generate_content([system_prompt] + gemini_contents)
+        analysis_text = response.text
+        
+        # Parse the response
+        questions = parse_gemini_response(analysis_text)
+        
+        return JSONResponse({
+            "success": True,
+            "questions": questions,
+            "raw_analysis": analysis_text
+        })
         
     except Exception as e:
-        logger.error(f"Analysis setup failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Analysis setup failed: {str(e)}")
+        logger.error(f"Analysis error: {str(e)}")
+        return JSONResponse({
+            "success": False,
+            "error": f"Analysis failed: {str(e)}"
+        }, status_code=500)
 
-def parse_detailed_data_improved(response_text):
-    """Parse AI response into structured data."""
+def parse_gemini_response(text: str):
+    """Parse Gemini response into structured questions."""
     questions = []
-    if not response_text:
-        return {"questions": questions}
+    sections = text.split("---")
     
-    # Simple parsing - split by question markers
-    lines = response_text.split('\n')
-    current_question = None
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
+    for section in sections:
+        section = section.strip()
+        if not section or "QUESTION" not in section:
             continue
             
-        # Look for question start
-        if line.lower().startswith('question') or line.startswith('Q'):
-            if current_question:
-                questions.append(current_question)
-            
-            # Extract question ID
-            question_id = line.split(':')[0].strip() if ':' in line else f"Q{len(questions)+1}"
-            current_question = {
-                "id": question_id,
-                "questionText": "",
-                "steps": [],
+        try:
+            lines = section.split('\n')
+            question_data = {
+                "id": "",
+                "question_text": "",
+                "student_answer": "",
                 "mistakes": [],
-                "hasErrors": False,
-                "correctedSteps": [],
-                "finalAnswer": ""
+                "corrected_solution": "",
+                "is_correct": False
             }
-        
-        # Look for question text
-        elif line.lower().startswith('question:'):
-            if current_question:
-                current_question["questionText"] = line.replace('Question:', '').strip()
-        
-        # Look for student solution
-        elif line.lower().startswith('student:'):
-            if current_question:
-                current_question["steps"].append(line.replace('Student:', '').strip())
-        
-        # Look for errors
-        elif line.lower().startswith('errors:'):
-            if current_question:
-                error_desc = line.replace('Errors:', '').strip()
-                if error_desc and error_desc.lower() != 'none':
-                    current_question["hasErrors"] = True
-                    current_question["mistakes"].append({
-                        "step": 1,
-                        "status": "Error",
-                        "desc": error_desc
-                    })
-        
-        # Look for correct solution
-        elif line.lower().startswith('correct:'):
-            if current_question:
-                current_question["correctedSteps"].append(line.replace('Correct:', '').strip())
+            
+            current_section = None
+            for line in lines:
+                line = line.strip()
+                
+                if line.startswith("QUESTION"):
+                    # Extract question number
+                    parts = line.split(":", 1)
+                    if len(parts) > 1:
+                        question_data["id"] = parts[0].replace("QUESTION", "").strip()
+                        question_data["question_text"] = parts[1].strip()
+                    else:
+                        question_data["id"] = line.replace("QUESTION", "").strip()
+                
+                elif line == "STUDENT'S ANSWER:":
+                    current_section = "student"
+                elif line == "MISTAKES:":
+                    current_section = "mistakes"
+                elif line == "CORRECTED SOLUTION:":
+                    current_section = "corrected"
+                elif line.startswith("MATCH:"):
+                    question_data["is_correct"] = "YES" in line.upper()
+                
+                elif current_section == "student" and line and not line.startswith(("MISTAKES:", "CORRECTED SOLUTION:", "MATCH:")):
+                    question_data["student_answer"] += line + "\n"
+                elif current_section == "mistakes" and line and line.startswith("-"):
+                    mistake = line[1:].strip()
+                    if mistake and "no mistakes" not in mistake.lower():
+                        question_data["mistakes"].append(mistake)
+                elif current_section == "corrected" and line and not line.startswith("MATCH:"):
+                    question_data["corrected_solution"] += line + "\n"
+            
+            # Clean up text
+            for key in ["question_text", "student_answer", "corrected_solution"]:
+                if question_data[key]:
+                    question_data[key] = question_data[key].strip()
+            
+            # If no ID, generate one
+            if not question_data["id"]:
+                question_data["id"] = f"Q{len(questions)+1}"
+            
+            questions.append(question_data)
+            
+        except Exception as e:
+            logger.error(f"Error parsing section: {e}")
+            continue
     
-    # Add the last question
-    if current_question:
-        questions.append(current_question)
-    
-    # If no questions were parsed, create a default one
+    # If parsing failed, create a simple structure
     if not questions:
         questions = [{
             "id": "Q1",
-            "questionText": "Math problem analysis",
-            "steps": ["Student's solution will appear here"],
-            "mistakes": [],
-            "hasErrors": False,
-            "correctedSteps": ["Correct solution will appear here"],
-            "finalAnswer": ""
+            "question_text": "Math problem from uploaded files",
+            "student_answer": "Student's solution will appear here",
+            "mistakes": ["Analysis in progress"],
+            "corrected_solution": "Correct solution will appear here",
+            "is_correct": False
         }]
     
-    return {"questions": questions}
+    return questions
 
-@app.post("/create-practice-paper")
-async def create_practice_paper(request: dict):
-    """Create practice paper based on mistakes."""
+@app.post("/reanalyze-question")
+async def reanalyze_question(request: dict):
+    """Reanalyze a specific question based on user feedback."""
     try:
-        detailed_data = request.get("detailed_data", {})
-        questions_with_errors = []
+        question_id = request.get("question_id", "")
+        feedback = request.get("feedback", "")
+        original_question = request.get("original_question", {})
         
-        for q in detailed_data.get("questions", []):
-            if q.get('hasErrors', False):
-                questions_with_errors.append(q)
+        if not feedback or not original_question:
+            raise HTTPException(status_code=400, detail="Missing data")
         
-        if not questions_with_errors:
-            return JSONResponse({
-                "success": False,
-                "error": "No questions with errors found."
-            })
+        prompt = f"""Reanalyze this math question based on student feedback:
+
+Original Question {question_id}:
+{original_question.get('question_text', '')}
+
+Student's Original Answer:
+{original_question.get('student_answer', '')}
+
+Student Feedback: {feedback}
+
+Please provide:
+1. Updated mistakes list (be brief)
+2. Updated corrected solution
+3. Match status (YES/NO)
+
+Format:
+MISTAKES:
+- [brief mistakes]
+
+CORRECTED SOLUTION:
+[your solution]
+
+MATCH: [YES/NO]"""
         
-        # Create simple practice questions
-        practice_questions = []
-        for i, q in enumerate(questions_with_errors):
-            practice_questions.append(f"### Practice Question {i+1}\nBased on: {q['id']}\n\nSolve a similar problem focusing on the same concept.")
+        response = model.generate_content(prompt)
+        text = response.text
         
-        practice_paper = "\n\n".join(practice_questions)
+        # Parse the response
+        mistakes = []
+        corrected = ""
+        is_correct = False
+        
+        lines = text.split('\n')
+        current_section = None
+        for line in lines:
+            line = line.strip()
+            if line == "MISTAKES:":
+                current_section = "mistakes"
+            elif line == "CORRECTED SOLUTION:":
+                current_section = "corrected"
+            elif line.startswith("MATCH:"):
+                is_correct = "YES" in line.upper()
+            elif current_section == "mistakes" and line.startswith("-"):
+                mistakes.append(line[1:].strip())
+            elif current_section == "corrected" and line and not line.startswith("MATCH:"):
+                corrected += line + "\n"
+        
+        if not corrected:
+            corrected = "Solution will be updated after reanalysis"
         
         return JSONResponse({
             "success": True,
-            "practice_paper": practice_paper,
-            "questions_used": len(questions_with_errors)
+            "updated_mistakes": mistakes,
+            "updated_solution": corrected.strip(),
+            "is_correct": is_correct,
+            "message": "Question reanalyzed successfully"
         })
         
     except Exception as e:
-        logger.error(f"Practice paper creation failed: {str(e)}")
+        logger.error(f"Reanalysis error: {str(e)}")
         return JSONResponse({
             "success": False,
-            "error": f"Practice paper creation failed: {str(e)}"
-        }, status_code=500)
-
-@app.post("/generate-performance-pdf")
-async def generate_performance_pdf(request: Request):
-    """Simple PDF endpoint - returns JSON for now."""
-    try:
-        return JSONResponse({
-            "success": True,
-            "message": "PDF generation would be implemented here",
-            "pdf_url": "#"
-        })
-    except Exception as e:
-        return JSONResponse({
-            "success": False,
-            "error": f"PDF generation error: {str(e)}"
-        }, status_code=500)
-
-@app.post("/generate-detailed-pdf")
-async def generate_detailed_pdf(request: Request):
-    """Simple PDF endpoint - returns JSON for now."""
-    try:
-        return JSONResponse({
-            "success": True,
-            "message": "Detailed PDF would be generated here",
-            "pdf_url": "#"
-        })
-    except Exception as e:
-        return JSONResponse({
-            "success": False,
-            "error": f"PDF generation error: {str(e)}"
-        }, status_code=500)
-
-@app.post("/generate-practice-pdf")
-async def generate_practice_pdf(request: Request):
-    """Simple PDF endpoint - returns JSON for now."""
-    try:
-        return JSONResponse({
-            "success": True,
-            "message": "Practice PDF would be generated here",
-            "pdf_url": "#"
-        })
-    except Exception as e:
-        return JSONResponse({
-            "success": False,
-            "error": f"PDF generation error: {str(e)}"
+            "error": f"Reanalysis failed: {str(e)}"
         }, status_code=500)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
-
+    uvicorn.run(app, host="0.0.0.0", port=port)
