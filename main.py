@@ -48,9 +48,10 @@ def pil_to_base64_png(im: Image.Image) -> str:
     im.save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
-@app.get("/", response_class=HTMLResponse)
-async def serve_index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/")
+async def serve_index():
+    return FileResponse("index.html")
+
 
 @app.post("/upload-question")
 async def upload_question(files: List[UploadFile] = File(...)):
@@ -360,4 +361,5 @@ QUESTION [NEW_NUMBER]:
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
