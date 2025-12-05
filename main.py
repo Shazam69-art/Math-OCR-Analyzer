@@ -16,6 +16,9 @@ import logging
 from datetime import datetime
 import re
 from fastapi import Request
+from fastapi.responses import StreamingResponse
+import json
+
 
 # Configure Gemini# TO THIS:
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -125,11 +128,50 @@ async def analyze_chat(
         message: str = Form(""),
         files: List[UploadFile] = File([])
 ):
-    """Main analysis endpoint using Gemini with IMPROVED OUTPUT FORMAT."""
+    """Main analysis endpoint using Gemini with STREAMING to prevent timeout."""
     try:
         logger.info(f"Analysis request - Message: {message[:100]}, Files: {len(files)}")
-        # ENHANCED SYSTEM PROMPT WITH CLEANER OUTPUT FORMAT - UPDATED FOR SHORT ERROR ANALYSIS AND EXACT COPY
-        system_prompt = """You are a **PhD-Level Math Teacher** analyzing student work.
+        
+        # Create a streaming response
+        async def generate():
+            try:
+                # Send initial status
+                yield json.dumps({"status": "processing", "progress": 10, "message": "Starting analysis..."}) + "\n"
+                
+                # Process files (OPTIMIZED - limit files and pages)
+                file_contents = []
+                file_descriptions = []
+                
+                # Limit to max 2 files to prevent timeout
+                files_to_process = files[:2]
+                
+                for file_idx, file in enumerate(files_to_process):
+                    yield json.dumps({
+                        "status": "processing", 
+                        "progress": 20 + (file_idx * 15), 
+                        "message": f"Processing {file.filename}..."
+                    }) + "\n"
+                    
+                    if file.content_type in ["application/pdf", "image/jpeg", "image/png", "image/jpg"]:
+                        pages = await process_uploaded_file_optimized(file, max_pages=2)
+                        for page_b64 in pages:
+                            if len(file_contents) >= 3:  # Hard limit of 3 images total
+                                break
+                            file_contents.append({
+                                "mime_type": "image/png",
+                                "data": base64.b64decode(page_b64)
+                            })
+                        file_descriptions.append(f"Processed {file.filename} ({len(pages)} pages)")
+                
+                # Send processing update
+                yield json.dumps({
+                    "status": "processing", 
+                    "progress": 60, 
+                    "message": "Sending to Gemini for analysis..."
+                }) + "\n"
+                
+                # COMPLETE SYSTEM PROMPT WITH ALL TABLE ROWS
+                system_prompt = """You are a **PhD-Level Math Teacher** analyzing student work.
 **CRITICAL INSTRUCTIONS FOR OUTPUT:**
 1. **ALL MATHEMATICAL EXPRESSIONS MUST BE IN LATEX/MATHJAX FORMAT** - Use $...$ for inline math and $$...$$ for display math. Ensure 100% proper LaTeX for rendering.
 2. **PRESERVE STUDENT'S ORIGINAL SOLUTION EXACTLY (100% COPY-PASTE)** - Copy verbatim what the student wrote from the images/files. Do not modify, interpret, or regenerate any part. If text is unclear, copy as visible.
@@ -139,6 +181,7 @@ async def analyze_chat(
 6. **MARK QUESTIONS AS CORRECT** if student's final answer matches the correct answer, even if steps differ.
 7. **ONLY MARK ERRORS** when final answer differs significantly or when genuine mathematical mistakes exist.
 8. **DO NOT WRITE YOUR OWN ANSWERS IN STUDENT SOLUTION** - Only copy what the student actually submitted as final (ignoring strikethrough).
+
 **OUTPUT FORMAT - FOLLOW EXACTLY:**
 ## Question [EXACT LABEL]:
 **Full Question:** [Copy EXACT question text in MathJax format]
@@ -177,41 +220,78 @@ async def analyze_chat(
 | 16 | Inverse Trigonometric By Parts | (ii) \(\int \tan^{-1} x dx\) | **Performance:** Not Tested |
 | 17 | Integrals of the form \(\int e^x [f(x) + f'(x)] dx\) | (ii) \(\int e^x \left( \frac{1}{x^2} - \frac{2}{x^3} \right) dx\) | **Performance:** Not Tested |
 | 18 | Integration of (e^x)(sinx)<br/>Where terms keeps on repeating.<br/>\( \int e^{2x} \sin x dx \) | \(\int e^{3x} \sin 4x dx\)<br/>\( \int e^{3x} \sin 4x dx\) | **Performance:** Not Tested |
+
 **UPDATE TABLE BASED ON ACTUAL ANALYSIS:** For each concept tested, update status like: "Performance: Tested 2 Times - Perfect 2 (Q.1, Q.3)" or "Performance: Tested 1 Time - Mistakes 1 (Q.2)"
+
 ## Performance Insights
 [Provide insights with mathematical references in MathJax where needed]"""
-        # Process files
-        file_contents = []
-        file_descriptions = []
-        for file in files:
-            if file.content_type in ["application/pdf", "image/jpeg", "image/png", "image/jpg"]:
-                pages = await process_uploaded_file(file)
-                for page_b64 in pages:
-                    file_contents.append({
-                        "mime_type": "image/png",
-                        "data": base64.b64decode(page_b64)
-                    })
-                file_descriptions.append(f"Processed {file.filename} ({len(pages)} pages)")
-        # Prepare content for Gemini
-        contents = [system_prompt]
-        if message:
-            contents.append(f"User request: {message}")
-        contents.extend(file_contents)
-        # Call Gemini
-        response = model.generate_content(contents)
-        ai_response = response.text
-        # Parse detailed data for frontend
-        detailed_data = parse_detailed_data_improved(ai_response)
-        logger.info(f"Analysis completed. Found {len(detailed_data.get('questions', []))} questions")
-        return JSONResponse({
-            "status": "success",
-            "response": ai_response,
-            "detailed_data": detailed_data,
-            "files_processed": file_descriptions
-        })
+                
+                # Prepare content for Gemini
+                contents = [system_prompt]
+                if message:
+                    contents.append(f"User request: {message}")
+                contents.extend(file_contents)
+                
+                # CRITICAL: Use streaming with Gemini to avoid timeout
+                response = model.generate_content(contents, stream=True)
+                
+                # Stream the response chunk by chunk
+                full_response = ""
+                chunk_count = 0
+                
+                yield json.dumps({
+                    "status": "streaming", 
+                    "progress": 70, 
+                    "message": "Analyzing with Gemini..."
+                }) + "\n"
+                
+                for chunk in response:
+                    if chunk.text:
+                        full_response += chunk.text
+                        chunk_count += 1
+                        
+                        # Send chunks to frontend every few chunks
+                        if chunk_count % 5 == 0:  # Send every 5th chunk
+                            yield json.dumps({
+                                "status": "streaming_chunk",
+                                "chunk": chunk.text,
+                                "partial_progress": 70 + min(25, chunk_count * 2)
+                            }) + "\n"
+                
+                # Parse detailed data
+                detailed_data = parse_detailed_data_improved(full_response)
+                
+                # Send completion
+                yield json.dumps({
+                    "status": "complete",
+                    "response": full_response,
+                    "detailed_data": detailed_data,
+                    "files_processed": file_descriptions,
+                    "progress": 100
+                }) + "\n"
+                
+            except Exception as e:
+                logger.error(f"Streaming analysis failed: {str(e)}")
+                yield json.dumps({
+                    "status": "error",
+                    "error": f"Analysis failed: {str(e)}",
+                    "progress": 0
+                }) + "\n"
+        
+        # Return as streaming response
+        return StreamingResponse(
+            generate(),
+            media_type="application/x-ndjson",
+            headers={
+                "X-Accel-Buffering": "no",  # Disable buffering
+                "Cache-Control": "no-cache, no-transform"
+            }
+        )
+        
     except Exception as e:
-        logger.error(f"Analysis failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        logger.error(f"Analysis setup failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis setup failed: {str(e)}")
+
 
 def parse_detailed_data_improved(response_text):
     """IMPROVED parsing of AI response with better structure and error detection."""
@@ -1099,5 +1179,6 @@ async def generate_practice_pdf(request: Request):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+
 
 
