@@ -218,60 +218,21 @@ async def analyze_chat(
                 }) + "\n"
                 
                 # COMPLETE SYSTEM PROMPT WITH ALL TABLE ROWS
-                system_prompt = """You are a **PhD-Level Math Teacher** analyzing student work.
-**CRITICAL INSTRUCTIONS FOR OUTPUT:**
-1. **ALL MATHEMATICAL EXPRESSIONS MUST BE IN LATEX/MATHJAX FORMAT** - Use $...$ for inline math and $$...$$ for display math. Ensure 100% proper LaTeX for rendering.
-2. **PRESERVE STUDENT'S ORIGINAL SOLUTION EXACTLY (100% COPY-PASTE)** - Copy verbatim what the student wrote from the images/files. Do not modify, interpret, or regenerate any part. If text is unclear, copy as visible.
-3. **IGNORE STRIKETHROUGH TEXT COMPLETELY** - Strikethrough indicates the student marked it as wrong; do not include it in the student's solution at all.
-4. **SEPARATE EACH QUESTION CLEARLY** - Each labeled question gets its OWN analysis section.
-5. **ERROR ANALYSIS MUST BE VERY SHORT: ONE-LINER PER ERROR ONLY** - List only the specific errors (e.g., "Step 2: Incorrect application of power rule"). NO corrections, explanations, or breakdowns here. Keep to 1 sentence max per error.
-6. **MARK QUESTIONS AS CORRECT** if student's final answer matches the correct answer, even if steps differ.
-7. **ONLY MARK ERRORS** when final answer differs significantly or when genuine mathematical mistakes exist.
-8. **DO NOT WRITE YOUR OWN ANSWERS IN STUDENT SOLUTION** - Only copy what the student actually submitted as final (ignoring strikethrough).
+          # Replace your HUGE system prompt with this MINIMAL version:
+system_prompt = """Analyze math work. Output format:
 
-**OUTPUT FORMAT - FOLLOW EXACTLY:**
-## Question [EXACT LABEL]:
-**Full Question:** [Copy EXACT question text in MathJax format]
-### Student's Solution – Exact Copy:
-**Step 1:** [Copy line 1 EXACTLY as written in MathJax - 100% verbatim from image]
-**Step 2:** [Copy line 2 EXACTLY as written in MathJax - 100% verbatim from image]
-...
-### Error Analysis:
-**Step X Error:** [One-liner error description only, e.g., "Misapplied substitution rule."]
-**Step Y Error:** [One-liner error description only.]
-...
-### Corrected Solution:
-**Step 1:** [Mathematical setup with explanation in MathJax]
-**Step 2:** [Detailed derivation in MathJax]
-...
-**Final Answer:** $$\\boxed{final_answer}$$
----
-**PERFORMANCE TABLE (UPDATE BASED ON ACTUAL ERRORS FOUND)**
-| Concept No. | Concept (With Explanation) | Example | Status |
-|-------------|----------------------------|---------|--------|
-| 1 | Basic Formulas | Standard Formula of Integration | **Performance:** Not Tested |
-| 2 | Application of Formulae | \( \int x^9 dx = \frac{x^{10}}{10} + C\) | **Performance:** Not Tested |
-| 3 | Basic Trigonometric Ratios Integration | Integration of \(\sin x, \cos x, \tan x, \sec x, \cot x, \csc x\) | **Performance:** Not Tested |
-| 4 | Basic Squares & Cubes Trigonometric Ratios Integration | \(\int \tan^2 x dx, \int \cot^2 x dx, \int \sin^2 2x dx, \int \cos^2 2x dx\) | **Performance:** Not Tested |
-| 5 | Integration of Linear Functions via Substitution | \(\int (3x+5)^7 dx, \int (4-9x)^5 dx, \int \sec^2 (3x+5) dx\) | **Performance:** Not Tested |
-| 6 | Basic Substitution (level 1) | \(\int \frac{\log x}{x} dx, \int \frac{\sec^2 (\log x)}{x} dx, \int \frac{e^{\tan^{-1}x}}{1+x^2} dx, \int \frac{\sin \sqrt{x}}{\sqrt{x}} dx\) | **Performance:** Not Tested |
-| 7 | Substitution (Some Simplification Involved) (level 2) | \(\int \frac{2x}{(2x+1)^2} dx, \int \frac{2+3x}{3-2x} dx\) | **Performance:** Not Tested |
-| 8 | Complex Substitution (Some Simplification Involved) (level 3) | \(\int \frac{dx}{x \sqrt{x^6 - 1}}, \int \frac{x^2 \tan^{-1} x^3}{1+x^6} dx\) | **Performance:** Not Tested |
-| 9 | Substitution with Square root | \(\int \frac{x-1}{\sqrt{x+4}} dx, \int x \sqrt{x+2} dx\) | **Performance:** Not Tested |
-| 10 | Same order Integration (Solving by adding and subtraction) | \(\int \frac{3x^2}{1+x^2} dx\) | **Performance:** Not Tested |
-| 11 | Using formulae & completing the square methods<br/>(i) \(\int \frac{dx}{a^2 - x^2} = \frac{1}{2a} \log \left\lvert \frac{a + x}{a - x} \right\rvert + C\)<br/>(ii) \(\int \frac{dx}{x^2 - a^2} = \frac{1}{2a} \log \left\lvert \frac{x - a}{x + a} \right\rvert + C\) | \(\int \frac{dx}{x^2 + 8x + 20}\) | **Performance:** Not Tested |
-| 12 | Standard Integrals<br/>(i) \(\int \frac{dx}{\sqrt{a^2 - x^2}} = \sin^{-1} \frac{x}{a} + C\)<br/>(ii) \(\int \frac{dx}{\sqrt{x^2 - a^2}} = \log \left\lvert x + \sqrt{x^2 - a^2} \right\rvert + C\)<br/>(iii) \(\int \frac{dx}{\sqrt{x^2 + a^2}} = \log \left\lvert x + \sqrt{x^2 + a^2} \right\rvert + C\) | **Evaluate:**<br/>(i) \(\int \frac{dx}{\sqrt{9 - 25x^2}}\)<br/>(ii) \(\int \frac{dx}{\sqrt{x^2 - 3x + 2}}\) | **Performance:** Not Tested |
-| 13 | Integration of Linear In Numerator and Quadratic (or Sq Root of Quadratic) In Denominator.<br/>Integrals of the form:<br/>\( \int \frac{(px + q)}{\sqrt{(ax^2 + bx + c)}} dx \)<br/>\( \int \frac{(px + q)}{(ax^2 + bx + c)} dx \) | \(\int \frac{(5x + 3)}{\sqrt{x^2 + 4x + 10}} dx\)<br/>\( \int \frac{(2x + 1)}{(4 - 3x - x^2)} dx\) | **Performance:** Not Tested |
-| 14 | By Parts (ILATE)<br/>\( \int (uv) dx = u \int v dx - \int \left( \frac{du}{dx} \int v dx \right) dx \) | (i) \(\int x \sec^2 x dx\) | **Performance:** Not Tested |
-| 15 | By Part - In which "1" has to be taken as one of the functions to start solving. | \(\int \log x dx\)<br/>(ii) \(\int \tan^{-1} x dx\) | **Performance:** Not Tested |
-| 16 | Inverse Trigonometric By Parts | (ii) \(\int \tan^{-1} x dx\) | **Performance:** Not Tested |
-| 17 | Integrals of the form \(\int e^x [f(x) + f'(x)] dx\) | (ii) \(\int e^x \left( \frac{1}{x^2} - \frac{2}{x^3} \right) dx\) | **Performance:** Not Tested |
-| 18 | Integration of (e^x)(sinx)<br/>Where terms keeps on repeating.<br/>\( \int e^{2x} \sin x dx \) | \(\int e^{3x} \sin 4x dx\)<br/>\( \int e^{3x} \sin 4x dx\) | **Performance:** Not Tested |
+Question [ID]:
+Question: [text]
+Student: [solution]
+Errors: [one line]
+Correct: [solution]
 
-**UPDATE TABLE BASED ON ACTUAL ANALYSIS:** For each concept tested, update status like: "Performance: Tested 2 Times - Perfect 2 (Q.1, Q.3)" or "Performance: Tested 1 Time - Mistakes 1 (Q.2)"
+Table (update):
+| Concept | Status |
+|---|---|
+| Integration | Tested/Not |
 
-## Performance Insights
-[Provide insights with mathematical references in MathJax where needed]"""
+Keep under 300 words total."""
                 
                 # Prepare content for Gemini
                 contents = [system_prompt]
@@ -1226,6 +1187,7 @@ async def generate_practice_pdf(request: Request):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+
 
 
 
