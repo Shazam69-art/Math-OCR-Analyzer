@@ -332,60 +332,55 @@ async function performAnalysisStreaming(formData) {
             buffer = lines.pop(); // Keep incomplete line in buffer
             
             for (const line of lines) {
-                if (line.trim()) {
-                    try {
-                        const data = JSON.parse(line);
-                        console.log('Stream data:', data.status, data.progress);
-                        
-                        // Update progress bar in real-time
-                        if (data.progress !== undefined) {
-                            document.querySelector('.progress-fill').style.width = `${data.progress}%`;
-                        }
-                        
-                        // Update progress messages
-                        if (data.message) {
-                            const messagesContainer = document.getElementById('progressMessages');
-                            const messageDiv = document.createElement('div');
-                            messageDiv.className = 'progress-message';
-                            messageDiv.textContent = `• ${data.message}`;
-                            messagesContainer.appendChild(messageDiv);
-                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                            
-                            // Update progress text if it's a streaming chunk
-                            if (data.status === 'streaming_chunk' && data.chunk) {
-                                const lastMessage = messagesContainer.lastElementChild;
-                                if (lastMessage) {
-                                    lastMessage.textContent = `• Analyzing... (${data.partial_progress || 70}%)`;
-                                }
-                            }
-                        }
-                        
-                        // Handle completion
-                        if (data.status === 'complete') {
-                            analysisData = data.response;
-                            detailedData = data.detailed_data || { questions: [] };
-                            
-                            // Force MathJax rendering
-                            if (window.MathJax) {
-                                setTimeout(() => {
-                                    MathJax.typesetPromise();
-                                }, 1000);
-                            }
-                            
-                            return {
-                                response: data.response,
-                                detailed_data: data.detailed_data
-                            };
-                        }
-                        
-                        // Handle errors
-                        if (data.status === 'error') {
-                            throw new Error(data.error || 'Analysis failed');
-                        }
-                        
-                    } catch (e) {
-                        console.error('Error parsing stream line:', line, e);
+                const trimmedLine = line.trim();
+                if (!trimmedLine) continue;
+                
+                try {
+                    // FIX 1: Check if it's valid JSON first
+                    if (!trimmedLine.startsWith('{')) {
+                        console.log('Skipping non-JSON:', trimmedLine.substring(0, 50));
+                        continue;
                     }
+                    
+                    const data = JSON.parse(trimmedLine); // <-- NOW SAFE
+                    console.log('Stream:', data.status);
+                    
+                    // FIX 2: Handle progress updates
+                    if (data.progress !== undefined) {
+                        document.querySelector('.progress-fill').style.width = `${data.progress}%`;
+                    }
+                    
+                    if (data.message) {
+                        const messagesContainer = document.getElementById('progressMessages');
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'progress-message';
+                        messageDiv.textContent = `• ${data.message}`;
+                        messagesContainer.appendChild(messageDiv);
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                    
+                    // FIX 3: Handle completion properly
+                    if (data.status === 'complete') {
+                        // STORE AS STRING, NOT OBJECT
+                        analysisData = data.response || ''; 
+                        detailedData = data.detailed_data || { questions: [] };
+                        
+                        console.log('Analysis stored:', typeof analysisData);
+                        
+                        if (window.MathJax) {
+                            setTimeout(() => MathJax.typesetPromise(), 100);
+                        }
+                        
+                        return { response: data.response, detailed_data: data.detailed_data };
+                    }
+                    
+                    if (data.status === 'error') {
+                        throw new Error(data.error || 'Analysis failed');
+                    }
+                    
+                } catch (e) {
+                    console.log('Skipping malformed JSON line');
+                    // Don't throw, just skip bad lines
                 }
             }
         }
@@ -393,7 +388,7 @@ async function performAnalysisStreaming(formData) {
         throw new Error('Stream ended without completion');
         
     } catch (e) {
-        console.error('Analysis streaming error:', e);
+        console.error('Stream error:', e);
         throw e;
     }
 }
@@ -484,18 +479,23 @@ async function performAnalysisStreaming(formData) {
         document.getElementById('backToAnalysisPractice').onclick = showMainInterface;
 
         // Performance Report Rendering with streaming effect - FIXED TABLE SEPARATION
-        function renderPerformanceReport() {
-            const content = document.getElementById('conceptGapsContent');
-            content.innerHTML = '<div class="streaming-placeholder">Generating performance report...</div>';
-            
-            setTimeout(() => {
-                if (!analysisData) {
-                    content.innerHTML = '<p>No analysis data available.</p>';
-                    return;
-                }
-                
-                // Extract table from analysis data - FIXED: Separate table from insights
-                const tableMatch = analysisData.match(/\| Concept No\. \| Concept.*?(?=## Performance Insights|\|\s*$)/s);
+      function renderPerformanceReport() {
+    const content = document.getElementById('conceptGapsContent');
+    content.innerHTML = '<div class="streaming-placeholder">Generating performance report...</div>';
+    
+    setTimeout(() => {
+        // FIX: Check and convert to string
+        if (!analysisData) {
+            content.innerHTML = '<p>No analysis data available.</p>';
+            return;
+        }
+        
+        // Ensure it's a string
+        const analysisText = typeof analysisData === 'string' ? analysisData : 
+                            (analysisData.response || JSON.stringify(analysisData));
+        
+        // Now safe to use .match()
+        const tableMatch = analysisText.match(/\| Concept No\. \| Concept.*?(?=## Performance Insights|\|\s*$)/s);
                 let tableHTML = '<p>Performance data not available</p>';
                 
                 if (tableMatch) {
@@ -1075,4 +1075,5 @@ async function performAnalysisStreaming(formData) {
     </script>
 </body>
 </html>
+
 
