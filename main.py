@@ -184,35 +184,8 @@ async def start_analysis(job_id: str, websocket: WebSocket):
     
     job_data = uploaded_files[job_id]
     
-    try:
-        # Send progress updates
-        await send_progress(websocket, 10, "Processing uploaded images...")
-        
-        # Prepare images for Gemini (limit to reasonable number)
-        gemini_contents = []
-        
-        # Add question images (max 3)
-        for img_b64 in job_data["question_images"][:3]:
-            img_data = base64.b64decode(img_b64)
-            gemini_contents.append({
-                "mime_type": "image/png",
-                "data": img_data
-            })
-        
-        await send_progress(websocket, 25, "Extracting text from questions...")
-        
-        # Add answer images (max 3)
-        for img_b64 in job_data["answer_images"][:3]:
-            img_data = base64.b64decode(img_b64)
-            gemini_contents.append({
-                "mime_type": "image/png",
-                "data": img_data
-            })
-        
-        await send_progress(websocket, 40, "Analyzing student answers...")
-        
-        # System prompt for math analysis - UPDATED VERSION
-        system_prompt = """CRITICAL: You are analyzing scanned math exam papers. You MUST follow these rules STRICTLY:
+    # System prompt for math analysis - MOVED BEFORE try-except block
+    system_prompt = """CRITICAL: You are analyzing scanned math exam papers. You MUST follow these rules STRICTLY:
 
 1. EXTRACT EVERY SINGLE QUESTION from the images. Do NOT miss any.
 2. Question numbers must be EXACT as shown (e.g., "1", "2(a)", "Q3", "Question 4").
@@ -253,10 +226,37 @@ MATCH: [YES/NO]
 
 IMPORTANT: Analyze ALL visible questions. If there are multiple parts (a, b, c), treat each as separate.
 If student left blank, write "BLANK" as student answer and provide full solution."""
+    
+    try:
+        # Send progress updates
+        await send_progress(websocket, 10, "Processing uploaded images...")
+        
+        # Prepare images for Gemini (limit to reasonable number)
+        gemini_contents = []
+        
+        # Add question images (max 3)
+        for img_b64 in job_data["question_images"][:3]:
+            img_data = base64.b64decode(img_b64)
+            gemini_contents.append({
+                "mime_type": "image/png",
+                "data": img_data
+            })
+        
+        await send_progress(websocket, 25, "Extracting text from questions...")
+        
+        # Add answer images (max 3)
+        for img_b64 in job_data["answer_images"][:3]:
+            img_data = base64.b64decode(img_b64)
+            gemini_contents.append({
+                "mime_type": "image/png",
+                "data": img_data
+            })
+        
+        await send_progress(websocket, 40, "Analyzing student answers...")
         
         await send_progress(websocket, 60, "Running AI analysis...")
         
-        # Call Gemini with timeout
+        # Call Gemini with timeout - using a nested try-except for TimeoutError
         try:
             response = await asyncio.wait_for(
                 model.generate_content_async([system_prompt] + gemini_contents),
@@ -269,6 +269,7 @@ If student left blank, write "BLANK" as student answer and provide full solution
                 "message": "Analysis timed out. Please try with fewer images or smaller files."
             })
             return
+        
         await send_progress(websocket, 80, "Parsing analysis results...")
         
         # Parse the response
@@ -300,6 +301,8 @@ If student left blank, write "BLANK" as student answer and provide full solution
             "type": "error",
             "message": f"Analysis failed: {str(e)}"
         })
+
+
 
 async def send_progress(websocket: WebSocket, progress: int, message: str):
     """Send progress update to client."""
@@ -525,6 +528,7 @@ async def cleanup_old_files():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
