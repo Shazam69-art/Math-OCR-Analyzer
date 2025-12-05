@@ -12,8 +12,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from PIL import Image
 from pdf2image import convert_from_bytes
 import google.generativeai as genai
@@ -45,28 +44,6 @@ active_connections = {}
 analysis_jobs = {}
 uploaded_files = {}
 
-# ========== CUSTOM STATIC FILES FIX ==========
-# Create a custom StaticFiles class that excludes WebSocket connections
-class WebSocketSafeStaticFiles(StaticFiles):
-    async def __call__(self, scope, receive, send):
-        # Skip WebSocket connections (scope["type"] == "websocket")
-        if scope["type"] == "websocket":
-            # Return 404 for WebSocket connections to static files
-            await send({
-                'type': 'http.response.start',
-                'status': 404,
-                'headers': [(b'content-type', b'application/json')],
-            })
-            await send({
-                'type': 'http.response.body',
-                'body': b'{"error": "Not found"}',
-            })
-            return
-        
-        # For HTTP requests, use the normal static files handler
-        await super().__call__(scope, receive, send)
-
-# ========== ALL YOUR FUNCTIONS ==========
 def pil_to_base64_png(im: Image.Image) -> str:
     """Convert PIL Image to base64 PNG string."""
     buf = io.BytesIO()
@@ -108,10 +85,45 @@ async def process_image_file(file: UploadFile) -> List[str]:
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {file.content_type}")
 
-# ========== API ROUTES ==========
-@app.get("/")
+# Serve index.html explicitly
+@app.get("/", response_class=HTMLResponse)
 async def serve_index():
-    return FileResponse("index.html")
+    try:
+        with open("index.html", "r") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="index.html not found")
+
+# Serve other static files explicitly
+@app.get("/{filename}")
+async def serve_static(filename: str):
+    # Security check - prevent directory traversal
+    if ".." in filename or filename.startswith("/"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    valid_extensions = {".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".ico", ".svg"}
+    file_ext = os.path.splitext(filename)[1].lower()
+    
+    if file_ext not in valid_extensions:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    if not os.path.exists(filename):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine content type
+    content_types = {
+        ".html": "text/html",
+        ".css": "text/css",
+        ".js": "application/javascript",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".ico": "image/x-icon",
+        ".svg": "image/svg+xml"
+    }
+    
+    media_type = content_types.get(file_ext, "text/plain")
+    return FileResponse(filename, media_type=media_type)
 
 @app.get("/health")
 async def health_check():
@@ -393,11 +405,145 @@ def parse_gemini_response(text: str) -> List[Dict[str, Any]]:
     
     return questions
 
-# ... (keep all your other API routes: generate-paper, download, job, cleanup) ...
+@app.post("/api/generate-paper")
+async def generate_practice_paper(request: dict):
+    """Generate practice paper from analysis results."""
+    try:
+        job_id = request.get("job_id")
+        question_ids = request.get("question_ids", [])
+        
+        if job_id not in analysis_jobs:
+            raise HTTPException(status_code=404, detail="Analysis job not found")
+        
+        job = analysis_jobs[job_id]
+        selected_questions = [q for q in job["questions"] if q["id"] in question_ids and not q["isCorrect"]]
+        
+        if not selected_questions:
+            raise HTTPException(status_code=400, detail="No questions selected for redesign")
+        
+        # Generate redesigned questions
+        redesigned_content = generate_redesigned_paper(selected_questions)
+        
+        # Create downloadable file
+        filename = f"practice_paper_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        filepath = Path("generated_papers") / filename
+        filepath.parent.mkdir(exist_ok=True)
+        
+        with open(filepath, "w") as f:
+            f.write(redesigned_content)
+        
+        return JSONResponse({
+            "success": True,
+            "filename": filename,
+            "download_url": f"/api/download/{filename}",
+            "message": f"Generated practice paper with {len(selected_questions)} questions"
+        })
+        
+    except Exception as e:
+        logger.error(f"Paper generation error: {str(e)}")
+        return JSONResponse({
+            "success": False,
+            "error": f"Paper generation failed: {str(e)}"
+        }, status_code=500)
 
-# ========== MOUNT STATIC FILES WITH FIX ==========
-# Use our custom WebSocket-safe static files handler
-app.mount("/", WebSocketSafeStaticFiles(directory=".", html=True), name="static")
+def generate_redesigned_paper(questions: List[Dict[str, Any]]) -> str:
+    """Generate practice paper with redesigned questions."""
+    content = "PRACTICE PAPER - MATH PROBLEMS\n"
+    content += "=" * 50 + "\n\n"
+    
+    for i, question in enumerate(questions, 1):
+        content += f"Question {i} (Based on {question['number']})\n"
+        content += "-" * 30 + "\n\n"
+        
+        # Generate redesigned version
+        redesigned = redesign_question(question["originalQuestion"])
+        content += f"{redesigned}\n\n"
+        
+        content += "Common Error to Avoid:\n"
+        if question["mistakes"]:
+            content += f"• {question['mistakes'][0]}\n\n"
+        
+        content += "Space for Solution:\n"
+        content += "\n" * 5
+        content += "=" * 50 + "\n\n"
+    
+    return content
+
+def redesign_question(question_text: str) -> str:
+    """Redesign question by changing coefficients/variables."""
+    # Simple coefficient/variable replacement
+    replacements = {
+        '3': '5', '2': '4', '1': '3', '4': '6',
+        'x': 't', 'y': 'z',
+        '\\sin': '\\cos', '\\cos': '\\sin',
+        'a': 'm', 'b': 'n'
+    }
+    
+    redesigned = question_text
+    for old, new in replacements.items():
+        redesigned = redesigned.replace(old, new)
+    
+    return redesigned
+
+@app.get("/api/download/{filename}")
+async def download_file(filename: str):
+    """Download generated practice paper."""
+    filepath = Path("generated_papers") / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(
+        path=filepath,
+        filename=filename,
+        media_type="text/plain"
+    )
+
+@app.get("/api/job/{job_id}")
+async def get_job_status(job_id: str):
+    """Get status of analysis job."""
+    if job_id in analysis_jobs:
+        return JSONResponse({
+            "status": "completed",
+            "job_id": job_id,
+            "questions_count": len(analysis_jobs[job_id]["questions"])
+        })
+    elif job_id in uploaded_files:
+        return JSONResponse({
+            "status": "uploaded",
+            "job_id": job_id
+        })
+    else:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+@app.delete("/api/cleanup")
+async def cleanup_old_files():
+    """Clean up old uploaded files and analysis jobs."""
+    cutoff_time = datetime.now().timestamp() - 3600  # 1 hour ago
+    
+    # Clean uploaded files
+    jobs_to_remove = []
+    for job_id, data in uploaded_files.items():
+        created_time = datetime.fromisoformat(data["created_at"]).timestamp()
+        if created_time < cutoff_time:
+            jobs_to_remove.append(job_id)
+    
+    for job_id in jobs_to_remove:
+        del uploaded_files[job_id]
+    
+    # Clean analysis jobs
+    jobs_to_remove = []
+    for job_id, data in analysis_jobs.items():
+        if job_id not in uploaded_files:
+            jobs_to_remove.append(job_id)
+    
+    for job_id in jobs_to_remove:
+        del analysis_jobs[job_id]
+    
+    return JSONResponse({
+        "success": True,
+        "cleaned_files": len(jobs_to_remove),
+        "message": f"Cleaned up {len(jobs_to_remove)} old jobs"
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
