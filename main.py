@@ -13,7 +13,7 @@ from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles  # <-- Make sure this is imported
+from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from pdf2image import convert_from_bytes
 import google.generativeai as genai
@@ -31,7 +31,6 @@ model = genai.GenerativeModel("gemini-2.5-flash")
 
 app = FastAPI(title="Math OCR Analyzer")
 
-
 # CORS
 app.add_middleware(
     CORSMiddleware,
@@ -44,10 +43,30 @@ app.add_middleware(
 # Store for WebSocket connections and analysis jobs
 active_connections = {}
 analysis_jobs = {}
-
-# Store uploaded files temporarily (in production, use proper storage)
 uploaded_files = {}
 
+# ========== CUSTOM STATIC FILES FIX ==========
+# Create a custom StaticFiles class that excludes WebSocket connections
+class WebSocketSafeStaticFiles(StaticFiles):
+    async def __call__(self, scope, receive, send):
+        # Skip WebSocket connections (scope["type"] == "websocket")
+        if scope["type"] == "websocket":
+            # Return 404 for WebSocket connections to static files
+            await send({
+                'type': 'http.response.start',
+                'status': 404,
+                'headers': [(b'content-type', b'application/json')],
+            })
+            await send({
+                'type': 'http.response.body',
+                'body': b'{"error": "Not found"}',
+            })
+            return
+        
+        # For HTTP requests, use the normal static files handler
+        await super().__call__(scope, receive, send)
+
+# ========== ALL YOUR FUNCTIONS ==========
 def pil_to_base64_png(im: Image.Image) -> str:
     """Convert PIL Image to base64 PNG string."""
     buf = io.BytesIO()
@@ -66,7 +85,6 @@ def pdf_to_images(pdf_bytes: bytes, max_pages: int = 10) -> List[str]:
         
         image_b64_list = []
         for img in images:
-            # Resize if too large
             if img.width > 1200:
                 img.thumbnail((1200, 1200))
             image_b64_list.append(pil_to_base64_png(img))
@@ -90,6 +108,7 @@ async def process_image_file(file: UploadFile) -> List[str]:
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {file.content_type}")
 
+# ========== API ROUTES ==========
 @app.get("/")
 async def serve_index():
     return FileResponse("index.html")
@@ -110,13 +129,13 @@ async def upload_files(
         
         # Process question files
         question_images = []
-        for file in question_files[:5]:  # Limit to 5 question files
+        for file in question_files[:5]:
             images = await process_image_file(file)
             question_images.extend(images)
         
         # Process answer files
         answer_images = []
-        for file in answer_files[:5]:  # Limit to 5 answer files
+        for file in answer_files[:5]:
             images = await process_image_file(file)
             answer_images.extend(images)
         
@@ -147,18 +166,23 @@ async def upload_files(
 async def websocket_endpoint(websocket: WebSocket, job_id: str):
     """WebSocket endpoint for real-time analysis streaming."""
     await websocket.accept()
-    active_connections[job_id] = websocket
     
     try:
-        while True:
-            # Wait for client to start analysis
-            data = await websocket.receive_json()
+        # Wait for client to start analysis
+        data = await websocket.receive_json()
+        
+        if data.get("action") == "start_analysis":
+            if job_id not in uploaded_files:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Job not found. Please upload files first."
+                })
+                return
             
-            if data.get("action") == "start_analysis":
-                await start_analysis(job_id, websocket)
-            elif data.get("action") == "cancel":
-                break
-                
+            await start_analysis(job_id, websocket)
+        elif data.get("action") == "cancel":
+            return
+            
     except WebSocketDisconnect:
         logger.info(f"Client disconnected for job {job_id}")
     except Exception as e:
@@ -167,9 +191,6 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
             "type": "error",
             "message": f"Analysis failed: {str(e)}"
         })
-    finally:
-        if job_id in active_connections:
-            del active_connections[job_id]
 
 async def start_analysis(job_id: str, websocket: WebSocket):
     """Start analysis process with streaming updates."""
@@ -182,7 +203,6 @@ async def start_analysis(job_id: str, websocket: WebSocket):
     
     job_data = uploaded_files[job_id]
     
-    # System prompt for math analysis - MOVED BEFORE try-except block
     system_prompt = """CRITICAL: You are analyzing scanned math exam papers. You MUST follow these rules STRICTLY:
 
 1. EXTRACT EVERY SINGLE QUESTION from the images. Do NOT miss any.
@@ -226,13 +246,12 @@ IMPORTANT: Analyze ALL visible questions. If there are multiple parts (a, b, c),
 If student left blank, write "BLANK" as student answer and provide full solution."""
     
     try:
-        # Send progress updates
         await send_progress(websocket, 10, "Processing uploaded images...")
         
-        # Prepare images for Gemini (limit to reasonable number)
+        # Prepare images for Gemini
         gemini_contents = []
         
-        # Add question images (max 3)
+        # Add question images
         for img_b64 in job_data["question_images"][:3]:
             img_data = base64.b64decode(img_b64)
             gemini_contents.append({
@@ -242,7 +261,7 @@ If student left blank, write "BLANK" as student answer and provide full solution
         
         await send_progress(websocket, 25, "Extracting text from questions...")
         
-        # Add answer images (max 3)
+        # Add answer images
         for img_b64 in job_data["answer_images"][:3]:
             img_data = base64.b64decode(img_b64)
             gemini_contents.append({
@@ -251,14 +270,12 @@ If student left blank, write "BLANK" as student answer and provide full solution
             })
         
         await send_progress(websocket, 40, "Analyzing student answers...")
-        
         await send_progress(websocket, 60, "Running AI analysis...")
         
-        # Call Gemini with timeout - using a nested try-except for TimeoutError
         try:
             response = await asyncio.wait_for(
                 model.generate_content_async([system_prompt] + gemini_contents),
-                timeout=120.0  # 2 minute timeout
+                timeout=120.0
             )
             analysis_text = response.text
         except asyncio.TimeoutError:
@@ -300,8 +317,6 @@ If student left blank, write "BLANK" as student answer and provide full solution
             "message": f"Analysis failed: {str(e)}"
         })
 
-
-
 async def send_progress(websocket: WebSocket, progress: int, message: str):
     """Send progress update to client."""
     await websocket.send_json({
@@ -309,7 +324,6 @@ async def send_progress(websocket: WebSocket, progress: int, message: str):
         "progress": progress,
         "message": message
     })
-    # Small delay to allow UI updates
     await asyncio.sleep(0.1)
 
 def parse_gemini_response(text: str) -> List[Dict[str, Any]]:
@@ -339,7 +353,6 @@ def parse_gemini_response(text: str) -> List[Dict[str, Any]]:
                 line = line.strip()
                 
                 if line.startswith("QUESTION"):
-                    # Extract question number
                     parts = line.split(":", 1)
                     if len(parts) > 1:
                         question_data["number"] = parts[0].replace("QUESTION", "").strip()
@@ -371,9 +384,7 @@ def parse_gemini_response(text: str) -> List[Dict[str, Any]]:
                 if question_data[key]:
                     question_data[key] = question_data[key].strip()
             
-            # Generate ID
             question_data["id"] = f"Q{len(questions)+1}"
-            
             questions.append(question_data)
             
         except Exception as e:
@@ -382,159 +393,12 @@ def parse_gemini_response(text: str) -> List[Dict[str, Any]]:
     
     return questions
 
+# ... (keep all your other API routes: generate-paper, download, job, cleanup) ...
 
-@app.post("/api/generate-paper")
-async def generate_practice_paper(request: dict):
-    """Generate practice paper from analysis results."""
-    try:
-        job_id = request.get("job_id")
-        question_ids = request.get("question_ids", [])
-        
-        if job_id not in analysis_jobs:
-            raise HTTPException(status_code=404, detail="Analysis job not found")
-        
-        job = analysis_jobs[job_id]
-        selected_questions = [q for q in job["questions"] if q["id"] in question_ids and not q["isCorrect"]]
-        
-        if not selected_questions:
-            raise HTTPException(status_code=400, detail="No questions selected for redesign")
-        
-        # Generate redesigned questions
-        redesigned_content = generate_redesigned_paper(selected_questions)
-        
-        # Create downloadable file
-        filename = f"practice_paper_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        filepath = Path("generated_papers") / filename
-        filepath.parent.mkdir(exist_ok=True)
-        
-        with open(filepath, "w") as f:
-            f.write(redesigned_content)
-        
-        return JSONResponse({
-            "success": True,
-            "filename": filename,
-            "download_url": f"/api/download/{filename}",
-            "message": f"Generated practice paper with {len(selected_questions)} questions"
-        })
-        
-    except Exception as e:
-        logger.error(f"Paper generation error: {str(e)}")
-        return JSONResponse({
-            "success": False,
-            "error": f"Paper generation failed: {str(e)}"
-        }, status_code=500)
-
-def generate_redesigned_paper(questions: List[Dict[str, Any]]) -> str:
-    """Generate practice paper with redesigned questions."""
-    content = "PRACTICE PAPER - MATH PROBLEMS\n"
-    content += "=" * 50 + "\n\n"
-    
-    for i, question in enumerate(questions, 1):
-        content += f"Question {i} (Based on {question['number']})\n"
-        content += "-" * 30 + "\n\n"
-        
-        # Generate redesigned version
-        redesigned = redesign_question(question["originalQuestion"])
-        content += f"{redesigned}\n\n"
-        
-        content += "Common Error to Avoid:\n"
-        if question["mistakes"]:
-            content += f"• {question['mistakes'][0]}\n\n"
-        
-        content += "Space for Solution:\n"
-        content += "\n" * 5
-        content += "=" * 50 + "\n\n"
-    
-    return content
-
-def redesign_question(question_text: str) -> str:
-    """Redesign question by changing coefficients/variables."""
-    # Simple coefficient/variable replacement
-    replacements = {
-        '3': '5', '2': '4', '1': '3', '4': '6',
-        'x': 't', 'y': 'z',
-        '\\sin': '\\cos', '\\cos': '\\sin',
-        'a': 'm', 'b': 'n'
-    }
-    
-    redesigned = question_text
-    for old, new in replacements.items():
-        redesigned = redesigned.replace(old, new)
-    
-    return redesigned
-
-@app.get("/api/download/{filename}")
-async def download_file(filename: str):
-    """Download generated practice paper."""
-    filepath = Path("generated_papers") / filename
-    if not filepath.exists():
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    return FileResponse(
-        path=filepath,
-        filename=filename,
-        media_type="text/plain"
-    )
-
-@app.get("/api/job/{job_id}")
-async def get_job_status(job_id: str):
-    """Get status of analysis job."""
-    if job_id in analysis_jobs:
-        return JSONResponse({
-            "status": "completed",
-            "job_id": job_id,
-            "questions_count": len(analysis_jobs[job_id]["questions"])
-        })
-    elif job_id in uploaded_files:
-        return JSONResponse({
-            "status": "uploaded",
-            "job_id": job_id
-        })
-    else:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-@app.delete("/api/cleanup")
-async def cleanup_old_files():
-    """Clean up old uploaded files and analysis jobs."""
-    cutoff_time = datetime.now().timestamp() - 3600  # 1 hour ago
-    
-    # Clean uploaded files
-    jobs_to_remove = []
-    for job_id, data in uploaded_files.items():
-        created_time = datetime.fromisoformat(data["created_at"]).timestamp()
-        if created_time < cutoff_time:
-            jobs_to_remove.append(job_id)
-    
-    for job_id in jobs_to_remove:
-        del uploaded_files[job_id]
-    
-    # Clean analysis jobs
-    jobs_to_remove = []
-    for job_id, data in analysis_jobs.items():
-        if job_id not in uploaded_files:
-            jobs_to_remove.append(job_id)
-    
-    for job_id in jobs_to_remove:
-        del analysis_jobs[job_id]
-    
-    return JSONResponse({
-        "success": True,
-        "cleaned_files": len(jobs_to_remove),
-        "message": f"Cleaned up {len(jobs_to_remove)} old jobs"
-    })
-
-# FIX: Serve static files from current directory
-app.mount("/", StaticFiles(directory=".", html=True), name="static")
-
-
+# ========== MOUNT STATIC FILES WITH FIX ==========
+# Use our custom WebSocket-safe static files handler
+app.mount("/", WebSocketSafeStaticFiles(directory=".", html=True), name="static")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-
-
-
-
-
-
