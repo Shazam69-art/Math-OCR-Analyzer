@@ -332,7 +332,6 @@ def parse_gemini_response(text: str) -> List[Dict[str, Any]]:
                 "studentAnswer": "",
                 "correctAnswer": "",
                 "mistakes": [],
-                "explanation": "",
                 "isCorrect": False
             }
             
@@ -355,24 +354,21 @@ def parse_gemini_response(text: str) -> List[Dict[str, Any]]:
                     current_section = "mistakes"
                 elif line == "CORRECT SOLUTION:":
                     current_section = "correct"
-                elif line == "EXPLANATION:":
-                    current_section = "explanation"
                 elif line.startswith("MATCH:"):
                     question_data["isCorrect"] = "YES" in line.upper()
+                    current_section = None
                 
-                elif current_section == "student" and line and not line.startswith(("MISTAKES:", "CORRECT SOLUTION:", "EXPLANATION:", "MATCH:")):
+                elif current_section == "student" and line and not line.startswith(("MISTAKES:", "CORRECT SOLUTION:", "MATCH:")):
                     question_data["studentAnswer"] += line + "\n"
                 elif current_section == "mistakes" and line and line.startswith("-"):
                     mistake = line[1:].strip()
                     if mistake and "no mistakes" not in mistake.lower():
                         question_data["mistakes"].append(mistake)
-                elif current_section == "correct" and line and not line.startswith(("EXPLANATION:", "MATCH:")):
+                elif current_section == "correct" and line and not line.startswith("MATCH:"):
                     question_data["correctAnswer"] += line + "\n"
-                elif current_section == "explanation" and line and not line.startswith("MATCH:"):
-                    question_data["explanation"] += line + "\n"
             
             # Clean up text
-            for key in ["originalQuestion", "studentAnswer", "correctAnswer", "explanation"]:
+            for key in ["originalQuestion", "studentAnswer", "correctAnswer"]:
                 if question_data[key]:
                     question_data[key] = question_data[key].strip()
             
@@ -385,20 +381,8 @@ def parse_gemini_response(text: str) -> List[Dict[str, Any]]:
             logger.error(f"Error parsing section: {e}")
             continue
     
-    # If parsing failed, create fallback structure
-    if not questions:
-        questions = [{
-            "id": "Q1",
-            "number": "1",
-            "originalQuestion": "Math problem analysis in progress",
-            "studentAnswer": "Unable to parse student answer",
-            "correctAnswer": "Please check the uploaded files and try again",
-            "mistakes": ["Could not analyze the files properly"],
-            "explanation": "There was an error processing the uploaded files.",
-            "isCorrect": False
-        }]
-    
     return questions
+
 
 @app.post("/api/generate-paper")
 async def generate_practice_paper(request: dict):
@@ -543,6 +527,7 @@ async def cleanup_old_files():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
