@@ -31,8 +31,6 @@ model = genai.GenerativeModel("gemini-2.5-flash")
 
 app = FastAPI(title="Math OCR Analyzer")
 
-# FIX: Serve static files from current directory
-app.mount("/", StaticFiles(directory=".", html=True), name="static")
 
 # CORS
 app.add_middleware(
@@ -525,9 +523,15 @@ async def cleanup_old_files():
         "message": f"Cleaned up {len(jobs_to_remove)} old jobs"
     })
 
+# FIX: Serve static files from current directory
+app.mount("/", StaticFiles(directory=".", html=True), name="static")
+
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
