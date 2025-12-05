@@ -333,6 +333,7 @@ function generateSampleAnalysis() {
 }
 
 // Show detailed analysis
+// Show detailed analysis
 function showDetailedAnalysis() {
     if (!analysisResults) {
         alert('Please complete analysis first');
@@ -361,7 +362,7 @@ function showDetailedAnalysis() {
                     <div class="math-content">${question.studentAnswer}</div>
                     
                     ${!question.isCorrect ? `
-                        <div class="section-title">Mistakes Found</div>
+                        <div class="section-title">Mathematical Errors Found</div>
                         <ul class="mistakes-list">
                             ${question.mistakes.map(mistake => `
                                 <li class="mistake-item">${mistake}</li>
@@ -369,11 +370,8 @@ function showDetailedAnalysis() {
                         </ul>
                     ` : ''}
                     
-                    <div class="section-title">${question.isCorrect ? 'Correct Answer' : 'Corrected Solution'}</div>
+                    <div class="section-title">${question.isCorrect ? 'Correct Answer' : 'Correct Solution'}</div>
                     <div class="math-content">${question.correctAnswer}</div>
-                    
-                    <div class="section-title">Explanation</div>
-                    <div class="math-content">${question.explanation}</div>
                 </div>
             </div>
         `).join('')}
@@ -381,12 +379,21 @@ function showDetailedAnalysis() {
     
     analysisResultsDiv.classList.add('active');
     
-    // Typeset MathJax
+    // FORCE MathJax to render - FIXED!
     if (window.MathJax) {
-        MathJax.typesetPromise([analysisResultsDiv]);
+        MathJax.typesetPromise([analysisResultsDiv]).then(() => {
+            console.log('MathJax rendering complete');
+        }).catch((err) => {
+            console.error('MathJax rendering error:', err);
+            // Try again after a short delay
+            setTimeout(() => {
+                if (window.MathJax) {
+                    MathJax.typesetPromise([analysisResultsDiv]);
+                }
+            }, 500);
+        });
     }
 }
-
 // Show generate paper modal
 function showGeneratePaperModal() {
     if (!analysisResults) {
