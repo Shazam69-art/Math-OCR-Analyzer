@@ -97,7 +97,6 @@ async def analyze():
         for img_b64 in question_files[:4]:
             img_data = base64.b64decode(img_b64)
             gemini_contents.append({"mime_type": "image/png", "data": img_data})
-
         for img_b64 in answer_files[:4]:
             img_data = base64.b64decode(img_b64)
             gemini_contents.append({"mime_type": "image/png", "data": img_data})
@@ -105,25 +104,20 @@ async def analyze():
         system_prompt = """You are a math tutor analyzing student work. Follow these rules STRICTLY:
 1. Analyze EVERY question completely. NEVER skip any question.
 2. Extract ALL questions and their numbers EXACTLY as they appear (e.g., "1(a)", "Q2", "Question 3").
-3. For each question, show the student's answer EXACTLY as written. Preserve line breaks, symbols, everything. IGNORE strikethroughs.
-4. Find mistakes in student's answer. Be BRIEF and PRECISE - just state the simple mathematical error representation in 1 sentence, no theoretical description.
-5. Provide your own CORRECTED solution. If student's answer matches yours (even with different steps), mark as correct.
-6. Use PERFECT MathJax formatting: $inline$ for inline, $$display$$ for display.
-7. Continue until ALL questions are processed. No timeout or skipping.
-8. Output format MUST BE:
+3. For each question, show the student's answer EXACTLY as written. Preserve line breaks, symbols, everything.
+4. Find mistakes in student's answer. Provide **clear English explanations** of the errors, even if the error is mathematical.
+5. Provide your own CORRECTED solution in **full step-by-step detail**.
+6. Use PERFECT MathJax formatting: $...$ for inline, $$...$$ for display.
+7. Output format MUST BE:
 ---
-QUESTION [EXACT_NUMBER]:
-[Question text in MathJax]
-STUDENT'S ANSWER:
-[Exact answer text in MathJax]
+QUESTION [EXACT_NUMBER]: $$[Question text in MathJax]$$
+STUDENT'S ANSWER: $$[Exact answer text in MathJax]$$
 MISTAKES:
-- [Simple math error 1]
-- [Simple math error 2] (or "No mistakes found" if correct)
-CORRECTED SOLUTION:
-[Your solution in MathJax]
+- [Clear English explanation of mistake 1, with MathJax if needed]
+- [Clear English explanation of mistake 2]
+CORRECTED SOLUTION: $$[Full step-by-step solution in MathJax]$$
 MATCH: [YES/NO]
----
-"""
+---"""
 
         response = model.generate_content([system_prompt] + gemini_contents, stream=True)
 
@@ -132,12 +126,10 @@ MATCH: [YES/NO]
             for chunk in response:
                 full_text += chunk.text
                 yield chunk.text + "\n"
-            # Parse server-side for global storage
             questions = parse_gemini_response(full_text)
             analysis_questions = questions
 
         return StreamingResponse(generate(), media_type="text/plain")
-
     except Exception as e:
         logger.error(f"Analysis error: {str(e)}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
@@ -145,36 +137,33 @@ MATCH: [YES/NO]
 def parse_gemini_response(text: str):
     questions = []
     sections = text.split("---")
-   
+
     for section in sections:
         section = section.strip()
         if not section or "QUESTION" not in section:
             continue
-           
+
         try:
             lines = section.split('\n')
             question_data = {
                 "id": "",
-                "question_text": "",
-                "student_answer": "",
+                "question_text": "$$\text{No question text found}$$",
+                "student_answer": "$$\text{No answer provided}$$",
                 "mistakes": [],
-                "corrected_solution": "",
+                "corrected_solution": "$$\text{No corrected solution}$$",
                 "is_correct": False
             }
-           
+
             current_section = None
             for line in lines:
                 line = line.strip()
-               
+
                 if line.startswith("QUESTION"):
-                    # Extract question number
                     parts = line.split(":", 1)
+                    question_data["id"] = parts[0].replace("QUESTION", "").strip()
                     if len(parts) > 1:
-                        question_data["id"] = parts[0].replace("QUESTION", "").strip()
-                        question_data["question_text"] = parts[1].strip()
-                    else:
-                        question_data["id"] = line.replace("QUESTION", "").strip()
-               
+                        question_data["question_text"] = f"$${parts[1].strip()}$$"
+
                 elif line == "STUDENT'S ANSWER:":
                     current_section = "student"
                 elif line == "MISTAKES:":
@@ -183,42 +172,35 @@ def parse_gemini_response(text: str):
                     current_section = "corrected"
                 elif line.startswith("MATCH:"):
                     question_data["is_correct"] = "YES" in line.upper()
-               
-                elif current_section == "student" and line and not line.startsWith(("MISTAKES:", "CORRECTED SOLUTION:", "MATCH:")):
-                    question_data["student_answer"] += line + "\n"
-                elif current_section == "mistakes" and line and line.startswith("-"):
+
+                elif current_section == "student" and line and not line.startswith(("MISTAKES:", "CORRECTED SOLUTION:", "MATCH:")):
+                    question_data["student_answer"] = f"$${line}$$"
+                elif current_section == "mistakes" and line.startswith("-"):
                     mistake = line[1:].strip()
                     if mistake and "no mistakes" not in mistake.lower():
                         question_data["mistakes"].append(mistake)
                 elif current_section == "corrected" and line and not line.startswith("MATCH:"):
-                    question_data["corrected_solution"] += line + "\n"
-           
-            # Clean up text
-            for key in ["question_text", "student_answer", "corrected_solution"]:
-                if question_data[key]:
-                    question_data[key] = question_data[key].strip()
-           
-            # If no ID, generate one
+                    question_data["corrected_solution"] = f"$${line}$$"
+
             if not question_data["id"]:
                 question_data["id"] = f"Q{len(questions)+1}"
-           
+
             questions.append(question_data)
-           
+
         except Exception as e:
             logger.error(f"Error parsing section: {e}")
             continue
-   
-    # If parsing failed, create a simple structure
+
     if not questions:
         questions = [{
             "id": "Q1",
-            "question_text": "Math problem from uploaded files",
-            "student_answer": "Student's solution will appear here",
-            "mistakes": ["Analysis in progress"],
-            "corrected_solution": "Correct solution will appear here",
+            "question_text": "$$\text{Error parsing analysis}$$",
+            "student_answer": "$$\text{No answer provided}$$",
+            "mistakes": ["Analysis parsing failed"],
+            "corrected_solution": "$$\text{No solution provided}$$",
             "is_correct": False
         }]
-   
+
     return questions
 
 @app.post("/generate-paper")
@@ -235,10 +217,9 @@ async def generate_paper():
 - Output in MathJax format.
 Format:
 ---
-QUESTION [EXACT_NUMBER]:
-[New question text in MathJax]
----
-"""
+QUESTION [EXACT_NUMBER]: $$[New question text in MathJax]$$
+---"""
+
         wrong_text = "\n".join([f"QUESTION {q['id']}: {q['question_text']}" for q in wrong_questions])
         response = model.generate_content(prompt + wrong_text)
         new_questions = parse_generated_response(response.text)
@@ -250,27 +231,42 @@ QUESTION [EXACT_NUMBER]:
 def parse_generated_response(text: str):
     questions = []
     sections = text.split("---")
+
     for section in sections:
         section = section.strip()
         if not section or "QUESTION" not in section:
             continue
-        lines = section.split('\n')
-        q_data = {"id": "", "new_question": ""}
-        for line in lines:
-            line = line.strip()
-            if line.startswith("QUESTION"):
-                parts = line.split(":", 1)
-                q_data["id"] = parts[0].replace("QUESTION", "").strip()
-                if len(parts) > 1:
-                    q_data["new_question"] = parts[1].strip()
-            else:
-                q_data["new_question"] += line + "\n"
-        q_data["new_question"] = q_data["new_question"].strip()
-        questions.append(q_data)
+
+        try:
+            lines = section.split('\n')
+            q_data = {
+                "id": "",
+                "new_question": "$$\text{No new question generated}$$"
+            }
+
+            for line in lines:
+                line = line.strip()
+                if line.startswith("QUESTION"):
+                    parts = line.split(":", 1)
+                    q_data["id"] = parts[0].replace("QUESTION", "").strip()
+                    if len(parts) > 1:
+                        q_data["new_question"] = f"$${parts[1].strip()}$$"
+                elif line and not line.startswith("QUESTION"):
+                    q_data["new_question"] += f" {line}"
+
+            q_data["new_question"] = q_data["new_question"].strip()
+            if not q_data["id"]:
+                q_data["id"] = f"Q{len(questions)+1}"
+
+            questions.append(q_data)
+
+        except Exception as e:
+            logger.error(f"Error parsing generated question: {e}")
+            continue
+
     return questions
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
-
