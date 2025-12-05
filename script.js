@@ -115,9 +115,6 @@ function loadDashboard() {
     
     // Setup event listeners
     setupDashboardEvents();
-    
-    // Initialize WebSocket connection
-    setupWebSocket();
 }
 
 // Setup dashboard event listeners
@@ -234,15 +231,9 @@ async function beginAnalysis() {
         if (uploadResult.success && uploadResult.job_id) {
             currentJobId = uploadResult.job_id;
             
-            // 2. Connect WebSocket and start analysis
-            if (websocket && websocket.readyState === WebSocket.OPEN) {
-                websocket.send(JSON.stringify({
-                    action: 'start_analysis',
-                    job_id: currentJobId
-                }));
-            } else {
-                throw new Error('WebSocket not connected');
-            }
+            // 2. Connect WebSocket with job ID and start analysis
+            setupWebSocket(currentJobId);
+            
         } else {
             throw new Error(uploadResult.error || 'Upload failed');
         }
@@ -291,15 +282,23 @@ async function uploadFilesToBackend() {
 }
 
 // Setup WebSocket connection
-function setupWebSocket() {
+function setupWebSocket(jobId) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const wsUrl = `${protocol}//${window.location.host}/ws/${jobId}`;
+    
+    console.log('Connecting to WebSocket:', wsUrl);
     
     websocket = new WebSocket(wsUrl);
     
     websocket.onopen = () => {
         console.log('WebSocket connected to', wsUrl);
         addProgressUpdate('Connected to analysis server', 'success');
+        
+        // Immediately send start analysis message
+        websocket.send(JSON.stringify({
+            action: 'start_analysis',
+            job_id: jobId
+        }));
     };
     
     websocket.onmessage = (event) => {
@@ -319,8 +318,6 @@ function setupWebSocket() {
     websocket.onclose = () => {
         console.log('WebSocket disconnected');
         addProgressUpdate('Disconnected from server', 'warning');
-        // Try to reconnect after 3 seconds
-        setTimeout(setupWebSocket, 3000);
     };
 }
 
@@ -355,11 +352,6 @@ function addProgressUpdate(message, type = 'info') {
     updateDiv.classList.add(type);
     progressDetails.appendChild(updateDiv);
     progressDetails.scrollTop = progressDetails.scrollHeight;
-}
-
-// Wait function
-function wait(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // Show detailed analysis
@@ -412,6 +404,12 @@ function showDetailedAnalysis() {
     if (window.MathJax) {
         MathJax.typesetPromise([analysisResultsDiv]).catch(err => {
             console.error('MathJax rendering error:', err);
+            // Try again after a short delay
+            setTimeout(() => {
+                if (window.MathJax) {
+                    MathJax.typesetPromise([analysisResultsDiv]);
+                }
+            }, 500);
         });
     }
 }
@@ -617,13 +615,6 @@ window.addEventListener('resize', debounce(() => {
         MathJax.typesetPromise([analysisResultsDiv]);
     }
 }, 250));
-
-// Initialize MathJax typesetting for dynamic content
-function refreshMathJax() {
-    if (window.MathJax) {
-        MathJax.typesetPromise();
-    }
-}
 
 // Make functions available globally for event handlers
 window.handleLogout = handleLogout;
