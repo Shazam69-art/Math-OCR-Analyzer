@@ -3,9 +3,12 @@ import base64
 import io
 import json
 import requests
+import tempfile  # <-- ADD THIS
+from jinja2 import Template  # <-- ADD THIS
+import pdfkit  # <-- ADD THIS PROPERLY (if using)
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from PIL import Image
@@ -16,9 +19,6 @@ import logging
 from datetime import datetime
 import re
 from fastapi import Request
-from fastapi.responses import StreamingResponse
-import json
-
 
 # Configure Gemini# TO THIS:
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -193,11 +193,13 @@ async def analyze_chat(
                 files_to_process = files[:2]
                 
                 for file_idx, file in enumerate(files_to_process):
-                    yield json.dumps({
-                        "status": "processing", 
-                        "progress": 20 + (file_idx * 15), 
-                        "message": f"Processing {file.filename}..."
-                    }) + "\n"
+        yield json.dumps({
+    "status": "complete",
+    "response": full_response,  # <-- String
+    "detailed_data": detailed_data,  # <-- Dict
+    "files_processed": file_descriptions,
+    "progress": 100
+}) + "\n"
                     
                     if file.content_type in ["application/pdf", "image/jpeg", "image/png", "image/jpg"]:
                         pages = await process_uploaded_file_optimized(file, max_pages=2)
@@ -1180,6 +1182,7 @@ async def generate_practice_pdf(request: Request):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+
 
 
 
