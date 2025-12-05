@@ -1,6 +1,7 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
-pillow==12.0.0  # Updated to latest stable version
+pillow==12.0.0
 pdf2image==1.16.3
 google-generativeai==0.3.0
+pypdfium2==4.25.0  # <-- ADD THIS
