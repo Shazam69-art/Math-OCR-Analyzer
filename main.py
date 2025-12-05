@@ -115,6 +115,53 @@ async def process_uploaded_file(file: UploadFile) -> List[str]:
     else:
         raise HTTPException(status_code=400, detail="Unsupported file type")
 
+async def process_uploaded_file_optimized(file: UploadFile, max_pages: int = 2) -> List[str]:
+    """Process uploaded file with LIMITS to prevent timeout."""
+    content = await file.read()
+    
+    # Size limit check
+    if len(content) > 8 * 1024 * 1024:  # 8MB limit
+        raise HTTPException(status_code=400, detail="File too large (max 8MB)")
+    
+    if file.content_type == "application/pdf":
+        return pdf_all_pages_to_png_b64_optimized(content, max_pages=max_pages)
+    elif file.content_type.startswith("image/"):
+        image = Image.open(io.BytesIO(content))
+        # Resize large images
+        if image.size[0] > 1000 or image.size[1] > 1000:
+            image.thumbnail((1000, 1000))
+        return [pil_to_base64_png(image)]
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+def pdf_all_pages_to_png_b64_optimized(pdf_bytes: bytes, max_pages: int = 2, dpi: int = 100) -> list:
+    """Render LIMITED pages of a PDF to PNG with optimization."""
+    try:
+        doc = pdfium.PdfDocument(io.BytesIO(pdf_bytes))
+        if len(doc) == 0:
+            return []
+        
+        # Limit pages processed
+        pages_to_process = min(len(doc), max_pages)
+        scale = dpi / 72.0
+        pages_b64 = []
+        
+        for i in range(pages_to_process):
+            page = doc[i]
+            bitmap = page.render(scale=scale).to_pil()
+            
+            # Compress image
+            if bitmap.size[0] > 800:
+                bitmap.thumbnail((800, 800))
+            
+            page_b64 = pil_to_base64_png(bitmap)
+            pages_b64.append(page_b64)
+        
+        return pages_b64
+    except Exception as e:
+        logger.error(f"PDF processing error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"PDF processing error: {str(e)}")
+
 @app.get("/")
 async def serve_index():
     return FileResponse("index.html")
@@ -1179,6 +1226,7 @@ async def generate_practice_pdf(request: Request):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+
 
 
 
