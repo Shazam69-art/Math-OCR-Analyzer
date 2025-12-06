@@ -9,7 +9,6 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from PIL import Image
-import pypdfium2 as pdfium
 import google.generativeai as genai
 from typing import List
 import logging
@@ -49,32 +48,23 @@ def pil_to_base64_png(im: Image.Image) -> str:
     im.save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
-def pdf_all_pages_to_png_b64(pdf_bytes: bytes, dpi: int = 150) -> list:
-    """Render ALL pages of a PDF to PNG and return list of base64 strings."""
-    try:
-        doc = pdfium.PdfDocument(io.BytesIO(pdf_bytes))
-        if len(doc) == 0:
-            return []
-        scale = dpi / 72.0
-        pages_b64 = []
-        for i in range(len(doc)):
-            page = doc[i]
-            bitmap = page.render(scale=scale).to_pil()
-            page_b64 = pil_to_base64_png(bitmap)
-            pages_b64.append(page_b64)
-        return pages_b64
-    except Exception as e:
-        logger.error(f"PDF processing error: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"PDF processing error: {str(e)}")
-
 async def process_uploaded_file(file: UploadFile) -> List[str]:
     """Process uploaded file and return base64 encoded pages."""
     content = await file.read()
+    
     if file.content_type == "application/pdf":
-        return pdf_all_pages_to_png_b64(content)
+        # For PDF files, we'll just return a placeholder since pypdfium2 is not available
+        # In production, you should install pypdfium2 or use an alternative PDF library
+        logger.warning("PDF processing requires pypdfium2. Install it for full functionality.")
+        raise HTTPException(status_code=400, detail="PDF processing is not available. Please install pypdfium2 or convert PDFs to images.")
+    
     elif file.content_type.startswith("image/"):
-        image = Image.open(io.BytesIO(content))
-        return [pil_to_base64_png(image)]
+        try:
+            image = Image.open(io.BytesIO(content))
+            return [pil_to_base64_png(image)]
+        except Exception as e:
+            logger.error(f"Image processing error: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Image processing error: {str(e)}")
     else:
         raise HTTPException(status_code=400, detail="Unsupported file type")
 
@@ -95,7 +85,8 @@ async def analyze_chat(
     try:
         logger.info(f"Analysis request - Message: {message[:100]}, Files: {len(files)}")
         # ENHANCED SYSTEM PROMPT WITH CLEANER OUTPUT FORMAT - UPDATED FOR SHORT ERROR ANALYSIS AND EXACT COPY
-        system_prompt = """You are a **PhD-Level Math Teacher** analyzing student work.
+        # FIXED: Removed invalid escape sequences by using raw strings
+        system_prompt = r"""You are a **PhD-Level Math Teacher** analyzing student work.
 **CRITICAL INSTRUCTIONS FOR OUTPUT:**
 1. **ALL MATHEMATICAL EXPRESSIONS MUST BE IN LATEX/MATHJAX FORMAT** - Use $...$ for inline math and $$...$$ for display math. Ensure 100% proper LaTeX for rendering.
 2. **PRESERVE STUDENT'S ORIGINAL SOLUTION EXACTLY (100% COPY-PASTE)** - Copy verbatim what the student wrote from the images/files. Do not modify, interpret, or regenerate any part. If text is unclear, copy as visible.
@@ -120,13 +111,13 @@ async def analyze_chat(
 **Step 1:** [Mathematical setup with explanation in MathJax]
 **Step 2:** [Detailed derivation in MathJax]
 ...
-**Final Answer:** $$\\boxed{final_answer}$$
+**Final Answer:** $$\boxed{final_answer}$$
 ---
 **PERFORMANCE TABLE (UPDATE BASED ON ACTUAL ERRORS FOUND)**
 | Concept No. | Concept (With Explanation) | Example | Status |
 |-------------|----------------------------|---------|--------|
 | 1 | Basic Formulas | Standard Formula of Integration | **Performance:** Not Tested |
-| 2 | Application of Formulae | \( \int x^9 dx = \frac{x^{10}}{10} + C\) | **Performance:** Not Tested |
+| 2 | Application of Formulae | \(\int x^9 dx = \frac{x^{10}}{10} + C\) | **Performance:** Not Tested |
 | 3 | Basic Trigonometric Ratios Integration | Integration of \(\sin x, \cos x, \tan x, \sec x, \cot x, \csc x\) | **Performance:** Not Tested |
 | 4 | Basic Squares & Cubes Trigonometric Ratios Integration | \(\int \tan^2 x dx, \int \cot^2 x dx, \int \sin^2 2x dx, \int \cos^2 2x dx\) | **Performance:** Not Tested |
 | 5 | Integration of Linear Functions via Substitution | \(\int (3x+5)^7 dx, \int (4-9x)^5 dx, \int \sec^2 (3x+5) dx\) | **Performance:** Not Tested |
@@ -146,34 +137,44 @@ async def analyze_chat(
 **UPDATE TABLE BASED ON ACTUAL ANALYSIS:** For each concept tested, update status like: "Performance: Tested 2 Times - Perfect 2 (Q.1, Q.3)" or "Performance: Tested 1 Time - Mistakes 1 (Q.2)"
 ## Performance Insights
 [Provide insights with mathematical references in MathJax where needed]"""
+        
         # Process files
         file_contents = []
         file_descriptions = []
         for file in files:
             if file.content_type in ["application/pdf", "image/jpeg", "image/png", "image/jpg"]:
-                pages = await process_uploaded_file(file)
-                for page_b64 in pages:
-                    file_contents.append({
-                        "mime_type": "image/png",
-                        "data": base64.b64decode(page_b64)
-                    })
-                file_descriptions.append(f"Processed {file.filename} ({len(pages)} pages)")
+                try:
+                    pages = await process_uploaded_file(file)
+                    for page_b64 in pages:
+                        file_contents.append({
+                            "mime_type": "image/png",
+                            "data": base64.b64decode(page_b64)
+                        })
+                    file_descriptions.append(f"Processed {file.filename} ({len(pages)} pages)")
+                except HTTPException as he:
+                    raise he
+                except Exception as e:
+                    logger.error(f"Error processing file {file.filename}: {str(e)}")
+                    file_descriptions.append(f"Failed to process {file.filename}: {str(e)}")
+        
         # Prepare content for Gemini
         contents = [system_prompt]
         if message:
             contents.append(f"User request: {message}")
         contents.extend(file_contents)
+        
         # Call Gemini with timeout handling
         try:
             response = model.generate_content(contents)
             ai_response = response.text
         except Exception as genai_error:
             logger.error(f"Gemini API error: {str(genai_error)}")
-            raise HTTPException(status_code=504, detail=f"Analysis service is taking longer than expected. Please try again.")
+            raise HTTPException(status_code=504, detail="Analysis service is taking longer than expected. Please try again.")
         
         # Parse detailed data for frontend
         detailed_data = parse_detailed_data_improved(ai_response)
         logger.info(f"Analysis completed. Found {len(detailed_data.get('questions', []))} questions")
+        
         return JSONResponse({
             "status": "success",
             "response": ai_response,
@@ -191,11 +192,14 @@ def parse_detailed_data_improved(response_text):
     questions = []
     if not response_text:
         return {"questions": questions}
+    
     # IMPROVED QUESTION PARSING - SEPARATE EACH QUESTION CLEARLY
     question_sections = re.split(r'## Question\s+', response_text)
+    
     # Remove empty sections and header
     question_sections = [section for section in question_sections if
                          section.strip() and not section.startswith('Questions found')]
+    
     for i, section in enumerate(question_sections, 1):
         try:
             # Extract question ID - improved pattern matching
@@ -206,6 +210,7 @@ def parse_detailed_data_improved(response_text):
                 # Try alternative patterns
                 alt_match = re.search(r'^(Q?[0-9]+[a-z]?(?:\s*\([a-z]\))?)', section)
                 question_id = alt_match.group(1).strip() if alt_match else f"Q{i}"
+            
             # Extract question text - CLEANED TO REMOVE STUDENT SOLUTION CONTENT
             question_text = "Question content not extracted"
             if '**Full Question:**' in section:
@@ -214,8 +219,10 @@ def parse_detailed_data_improved(response_text):
                     question_text = question_part.split('###')[0].strip()
                 else:
                     question_text = question_part.strip()
+            
             # Clean question text from student solution content
             question_text = re.sub(r'### Student\'s Solution.*?###', '', question_text, flags=re.DOTALL).strip()
+            
             # Extract student work - PRESERVE EXACTLY AS SUBMITTED
             steps = []
             if '### Student\'s Solution' in section:
@@ -224,21 +231,26 @@ def parse_detailed_data_improved(response_text):
                     solution_section = solution_part.split('###')[0]
                 else:
                     solution_section = solution_part
+                
                 # Extract steps exactly as written - SIMPLE PARSING
                 step_patterns = [
                     r'\*\*Step\s+\d+:\*\*\s*(.*?)(?=\*\*Step\s+\d+:|###|\*\*Analysis|\Z)',
                     r'Step\s+\d+:\s*(.*?)(?=Step\s+\d+:|###|\*\*Analysis|\Z)'
                 ]
+                
                 for pattern in step_patterns:
                     step_matches = re.findall(pattern, solution_section, re.DOTALL | re.IGNORECASE)
                     if step_matches:
                         steps = [match.strip() for match in step_matches if match.strip()]
                         break
+            
             if not steps:
                 steps = ["No solution provided"]
+            
             # SIMPLE ERROR DETECTION - NO COMPLEX BREAKDOWNS - UPDATED FOR ONE-LINERS ONLY
             mistakes = []
             has_errors = False
+            
             # Look for error patterns with SIMPLE matching
             if '### Error Analysis' in section:
                 error_part = section.split('### Error Analysis')[1]
@@ -246,11 +258,13 @@ def parse_detailed_data_improved(response_text):
                     error_section = error_part.split('###')[0]
                 else:
                     error_section = error_part
+                
                 # Simple error pattern matching - ONE-LINER ONLY, NO CORRECTION EXTRACTION
                 error_patterns = [
                     r'\*\*Step\s*(\d+)\s*Error:\*\*\s*(.*?)(?=\*\*Step\s*\d+\s*Error:|\Z)',
                     r'Step\s*(\d+)\s*Error:\s*(.*?)(?=Step\s*\d+\s*Error:|\Z)'
                 ]
+                
                 for pattern in error_patterns:
                     error_matches = re.findall(pattern, error_section, re.DOTALL | re.IGNORECASE)
                     for match in error_matches:
@@ -262,6 +276,7 @@ def parse_detailed_data_improved(response_text):
                                 "status": "Error",
                                 "desc": error_desc.strip()  # One-liner only, no correction here
                             })
+            
             # Extract corrected solution
             corrected_steps = []
             if '### Corrected Solution' in section:
@@ -270,10 +285,12 @@ def parse_detailed_data_improved(response_text):
                     correct_section = correct_part.split('##')[0]
                 else:
                     correct_section = correct_part
+                
                 # Extract steps from corrected solution
                 step_pattern = r'\*\*Step\s+\d+:\*\*\s*(.*?)(?=\*\*Step\s+\d+:|\*\*Final Answer|\Z)'
                 step_matches = re.findall(step_pattern, correct_section, re.DOTALL)
                 corrected_steps = [match.strip() for match in step_matches if match.strip()]
+            
             # Extract final answer - PROPER MATHJAX FORMAT
             final_answer = ""
             final_match = re.search(r'\\boxed{(.*?)}', section)
@@ -287,6 +304,7 @@ def parse_detailed_data_improved(response_text):
                 else:
                     final_answer_text = answer_part.split('\n')[0].strip()
                     final_answer = f"$${final_answer_text}$$" if final_answer_text else ""
+            
             questions.append({
                 "id": question_id,
                 "questionText": question_text[:500] + "..." if len(question_text) > 500 else question_text,
@@ -296,6 +314,7 @@ def parse_detailed_data_improved(response_text):
                 "correctedSteps": corrected_steps or ["Complete solution will be shown after analysis"],
                 "finalAnswer": final_answer or "Answer will be determined after analysis"
             })
+        
         except Exception as e:
             logger.error(f"Error parsing question {i}: {e}")
             questions.append({
@@ -307,6 +326,7 @@ def parse_detailed_data_improved(response_text):
                 "correctedSteps": ["Solution analysis"],
                 "finalAnswer": "Answer pending"
             })
+    
     return {"questions": questions}
 
 @app.post("/analyze-feedback")
@@ -316,11 +336,13 @@ async def analyze_feedback(request: dict):
         question = request.get("question", {})
         feedback = request.get("feedback", "")
         original_analysis = request.get("original_analysis", "")
+        
         if not question or not feedback:
             return JSONResponse({
                 "success": False,
                 "error": "Missing question or feedback data"
             })
+        
         # Create prompt for feedback analysis
         feedback_prompt = f"""
         A user has provided feedback on the analysis of Question {question.get('id', 'Unknown')}:
@@ -333,15 +355,19 @@ async def analyze_feedback(request: dict):
         3. Ensuring all mathematical expressions are in proper MathJax/LaTeX format
         Provide the updated analysis for this question only.
         """
+        
         response = model.generate_content(feedback_prompt)
         updated_analysis = response.text
+        
         # Parse the updated analysis to extract the question data
         updated_question = parse_single_question(updated_analysis, question.get('id', f"Q{len(question)}"))
+        
         return JSONResponse({
             "success": True,
             "updated_question": updated_question,
             "message": "Analysis updated successfully"
         })
+    
     except Exception as e:
         logger.error(f"Feedback analysis failed: {str(e)}")
         return JSONResponse({
@@ -388,16 +414,20 @@ async def create_practice_paper(request: dict):
     try:
         detailed_data = request.get("detailed_data", {})
         questions_with_errors = []
+        
         # Include ALL questions with ANY errors (no genuine filter - pass down completely)
         for q in detailed_data.get("questions", []):
             if q.get('hasErrors', False) and q.get('mistakes'):
                 questions_with_errors.append(q)
+        
         logger.info(f"Found {len(questions_with_errors)} questions with errors for practice paper")
+        
         if not questions_with_errors:
             return JSONResponse({
                 "success": False,
                 "error": "No questions with errors found. Your solutions appear to be correct!"
             })
+        
         # FIXED PRACTICE PAPER PROMPT - Preserves exact question numbers, redesign ALL
         practice_prompt = f"""Create a targeted practice paper with EXACTLY {len(questions_with_errors)} redesigned questions.
 **CRITICAL REQUIREMENTS:**
@@ -419,24 +449,28 @@ async def create_practice_paper(request: dict):
 If original is Question 1(a), your output must be:
 ### Based on Question 1(a)
 **Original Question:**
-Evaluate $\\int x^9 dx$
+Evaluate $\int x^9 dx$
 **Modified Question:**
-Evaluate $\\int x^7 dx$
+Evaluate $\int x^7 dx$
 ---
 **IMPORTANT:**
 - Use the EXACT question number from the original (1(a), 2(b), 3, etc.)
 - NO extra text - just "Based on Question"
 - Each question must be separated by ---
 - Focus on same mathematical concepts with different coefficients/values - redesign EVERY one provided"""
+        
         response = model.generate_content(practice_prompt)
         practice_paper = response.text
+        
         logger.info(f"Successfully generated practice paper with {len(questions_with_errors)} questions")
+        
         return JSONResponse({
             "success": True,
             "practice_paper": practice_paper,
             "questions_used": len(questions_with_errors),
             "message": f"Practice paper created targeting {len(questions_with_errors)} error areas"
         })
+    
     except Exception as e:
         logger.error(f"Practice paper creation failed: {str(e)}")
         return JSONResponse({
