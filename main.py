@@ -15,12 +15,12 @@ import logging
 from datetime import datetime
 import re
 from fastapi import Request
+import time  # Added for retry mechanism
 
 # Configure Gemini from environment variable
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable is not set")
-
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.5-flash")
 
@@ -51,13 +51,13 @@ def pil_to_base64_png(im: Image.Image) -> str:
 async def process_uploaded_file(file: UploadFile) -> List[str]:
     """Process uploaded file and return base64 encoded pages."""
     content = await file.read()
-    
+   
     if file.content_type == "application/pdf":
         # For PDF files, we'll just return a placeholder since pypdfium2 is not available
         # In production, you should install pypdfium2 or use an alternative PDF library
         logger.warning("PDF processing requires pypdfium2. Install it for full functionality.")
         raise HTTPException(status_code=400, detail="PDF processing is not available. Please install pypdfium2 or convert PDFs to images.")
-    
+   
     elif file.content_type.startswith("image/"):
         try:
             image = Image.open(io.BytesIO(content))
@@ -86,30 +86,31 @@ async def analyze_chat(
         logger.info(f"Analysis request - Message: {message[:100]}, Files: {len(files)}")
         # ENHANCED SYSTEM PROMPT WITH CLEANER OUTPUT FORMAT - UPDATED FOR SHORT ERROR ANALYSIS AND EXACT COPY
         # FIXED: Removed invalid escape sequences by using raw strings
+        # IMPROVED: Emphasized exact verbatim copy of student's solution, short mathematical error terms (no long English), 100% correct solutions, exact question labels.
         system_prompt = r"""You are a **PhD-Level Math Teacher** analyzing student work.
 **CRITICAL INSTRUCTIONS FOR OUTPUT:**
 1. **ALL MATHEMATICAL EXPRESSIONS MUST BE IN LATEX/MATHJAX FORMAT** - Use $...$ for inline math and $$...$$ for display math. Ensure 100% proper LaTeX for rendering.
-2. **PRESERVE STUDENT'S ORIGINAL SOLUTION EXACTLY (100% COPY-PASTE)** - Copy verbatim what the student wrote from the images/files. Do not modify, interpret, or regenerate any part. If text is unclear, copy as visible.
+2. **PRESERVE STUDENT'S ORIGINAL SOLUTION EXACTLY (100% VERBATIM COPY-PASTE FROM IMAGES)** - Copy EXACTLY what the student wrote, line-by-line, without any interpretation, regeneration, or modification. If text is unclear, copy as visible. Do not add, remove, or rephrase ANY part of the student's work.
 3. **IGNORE STRIKETHROUGH TEXT COMPLETELY** - Strikethrough indicates the student marked it as wrong; do not include it in the student's solution at all.
-4. **SEPARATE EACH QUESTION CLEARLY** - Each labeled question gets its OWN analysis section.
-5. **ERROR ANALYSIS MUST BE VERY SHORT: ONE-LINER PER ERROR ONLY** - List only the specific errors (e.g., "Step 2: Incorrect application of power rule"). NO corrections, explanations, or breakdowns here. Keep to 1 sentence max per error.
-6. **MARK QUESTIONS AS CORRECT** if student's final answer matches the correct answer, even if steps differ.
-7. **ONLY MARK ERRORS** when final answer differs significantly or when genuine mathematical mistakes exist.
-8. **DO NOT WRITE YOUR OWN ANSWERS IN STUDENT SOLUTION** - Only copy what the student actually submitted as final (ignoring strikethrough).
+4. **SEPARATE EACH QUESTION CLEARLY** - Each labeled question gets its OWN analysis section. Use the EXACT question number/label from the images (e.g., "1(a)", "Q2", "Question 3(b)").
+5. **ERROR ANALYSIS MUST BE VERY SHORT: ONE-LINER IN MATHEMATICAL TERMS ONLY** - List only the specific mathematical error (e.g., "Step 2: Incorrect derivative of $x^2$ as $x$"). NO long English statements, explanations, theories, or breakdowns. Keep to 1 precise mathematical sentence per error.
+6. **MARK QUESTIONS AS CORRECT** if student's final answer matches the correct answer, even if steps differ slightly. Only flag genuine mathematical errors that affect the final result.
+7. **ONLY MARK ERRORS** when final answer differs significantly or when clear mathematical mistakes exist (e.g., wrong formula application, algebraic error).
+8. **DO NOT WRITE YOUR OWN ANSWERS IN STUDENT SOLUTION** - Only copy what the student actually submitted as final (ignoring strikethrough). Ensure your corrected solution is 100% mathematically accurate and complete.
 **OUTPUT FORMAT - FOLLOW EXACTLY:**
-## Question [EXACT LABEL]:
+## Question [EXACT LABEL FROM IMAGE]:
 **Full Question:** [Copy EXACT question text in MathJax format]
 ### Student's Solution – Exact Copy:
 **Step 1:** [Copy line 1 EXACTLY as written in MathJax - 100% verbatim from image]
 **Step 2:** [Copy line 2 EXACTLY as written in MathJax - 100% verbatim from image]
 ...
 ### Error Analysis:
-**Step X Error:** [One-liner error description only, e.g., "Misapplied substitution rule."]
-**Step Y Error:** [One-liner error description only.]
+**Step X Error:** [One-liner mathematical error term only, e.g., "Misapplied chain rule on $\sin(2x)$."]
+**Step Y Error:** [One-liner mathematical error term only.]
 ...
 ### Corrected Solution:
-**Step 1:** [Mathematical setup with explanation in MathJax]
-**Step 2:** [Detailed derivation in MathJax]
+**Step 1:** [Mathematical setup with explanation in MathJax - Ensure 100% correct]
+**Step 2:** [Detailed derivation in MathJax - Ensure 100% correct]
 ...
 **Final Answer:** $$\boxed{final_answer}$$
 ---
@@ -137,7 +138,7 @@ async def analyze_chat(
 **UPDATE TABLE BASED ON ACTUAL ANALYSIS:** For each concept tested, update status like: "Performance: Tested 2 Times - Perfect 2 (Q.1, Q.3)" or "Performance: Tested 1 Time - Mistakes 1 (Q.2)"
 ## Performance Insights
 [Provide insights with mathematical references in MathJax where needed]"""
-        
+       
         # Process files
         file_contents = []
         file_descriptions = []
@@ -156,25 +157,38 @@ async def analyze_chat(
                 except Exception as e:
                     logger.error(f"Error processing file {file.filename}: {str(e)}")
                     file_descriptions.append(f"Failed to process {file.filename}: {str(e)}")
-        
+       
         # Prepare content for Gemini
         contents = [system_prompt]
         if message:
             contents.append(f"User request: {message}")
         contents.extend(file_contents)
-        
-        # Call Gemini with timeout handling
-        try:
-            response = model.generate_content(contents)
-            ai_response = response.text
-        except Exception as genai_error:
-            logger.error(f"Gemini API error: {str(genai_error)}")
-            raise HTTPException(status_code=504, detail="Analysis service is taking longer than expected. Please try again.")
-        
+       
+        # Call Gemini with retry mechanism to handle timeouts
+        max_retries = 3
+        retry_delay = 5  # seconds
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content(contents)
+                ai_response = response.text
+                break  # Success, exit retry loop
+            except Exception as genai_error:
+                if "timeout" in str(genai_error).lower() or "deadline" in str(genai_error).lower():
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Timeout occurred on attempt {attempt + 1}. Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                    else:
+                        logger.error(f"Gemini API timeout after {max_retries} attempts: {str(genai_error)}")
+                        raise HTTPException(status_code=504, detail="Analysis service timed out after multiple attempts. Please try with fewer files or smaller images.")
+                else:
+                    logger.error(f"Gemini API error: {str(genai_error)}")
+                    raise HTTPException(status_code=500, detail=f"Analysis failed: {str(genai_error)}")
+       
         # Parse detailed data for frontend
         detailed_data = parse_detailed_data_improved(ai_response)
         logger.info(f"Analysis completed. Found {len(detailed_data.get('questions', []))} questions")
-        
+       
         return JSONResponse({
             "status": "success",
             "response": ai_response,
@@ -192,14 +206,14 @@ def parse_detailed_data_improved(response_text):
     questions = []
     if not response_text:
         return {"questions": questions}
-    
+   
     # IMPROVED QUESTION PARSING - SEPARATE EACH QUESTION CLEARLY
     question_sections = re.split(r'## Question\s+', response_text)
-    
+   
     # Remove empty sections and header
     question_sections = [section for section in question_sections if
                          section.strip() and not section.startswith('Questions found')]
-    
+   
     for i, section in enumerate(question_sections, 1):
         try:
             # Extract question ID - improved pattern matching
@@ -210,7 +224,7 @@ def parse_detailed_data_improved(response_text):
                 # Try alternative patterns
                 alt_match = re.search(r'^(Q?[0-9]+[a-z]?(?:\s*\([a-z]\))?)', section)
                 question_id = alt_match.group(1).strip() if alt_match else f"Q{i}"
-            
+           
             # Extract question text - CLEANED TO REMOVE STUDENT SOLUTION CONTENT
             question_text = "Question content not extracted"
             if '**Full Question:**' in section:
@@ -219,10 +233,10 @@ def parse_detailed_data_improved(response_text):
                     question_text = question_part.split('###')[0].strip()
                 else:
                     question_text = question_part.strip()
-            
+           
             # Clean question text from student solution content
             question_text = re.sub(r'### Student\'s Solution.*?###', '', question_text, flags=re.DOTALL).strip()
-            
+           
             # Extract student work - PRESERVE EXACTLY AS SUBMITTED
             steps = []
             if '### Student\'s Solution' in section:
@@ -231,26 +245,26 @@ def parse_detailed_data_improved(response_text):
                     solution_section = solution_part.split('###')[0]
                 else:
                     solution_section = solution_part
-                
+               
                 # Extract steps exactly as written - SIMPLE PARSING
                 step_patterns = [
                     r'\*\*Step\s+\d+:\*\*\s*(.*?)(?=\*\*Step\s+\d+:|###|\*\*Analysis|\Z)',
                     r'Step\s+\d+:\s*(.*?)(?=Step\s+\d+:|###|\*\*Analysis|\Z)'
                 ]
-                
+               
                 for pattern in step_patterns:
                     step_matches = re.findall(pattern, solution_section, re.DOTALL | re.IGNORECASE)
                     if step_matches:
                         steps = [match.strip() for match in step_matches if match.strip()]
                         break
-            
+           
             if not steps:
                 steps = ["No solution provided"]
-            
+           
             # SIMPLE ERROR DETECTION - NO COMPLEX BREAKDOWNS - UPDATED FOR ONE-LINERS ONLY
             mistakes = []
             has_errors = False
-            
+           
             # Look for error patterns with SIMPLE matching
             if '### Error Analysis' in section:
                 error_part = section.split('### Error Analysis')[1]
@@ -258,13 +272,13 @@ def parse_detailed_data_improved(response_text):
                     error_section = error_part.split('###')[0]
                 else:
                     error_section = error_part
-                
+               
                 # Simple error pattern matching - ONE-LINER ONLY, NO CORRECTION EXTRACTION
                 error_patterns = [
                     r'\*\*Step\s*(\d+)\s*Error:\*\*\s*(.*?)(?=\*\*Step\s*\d+\s*Error:|\Z)',
                     r'Step\s*(\d+)\s*Error:\s*(.*?)(?=Step\s*\d+\s*Error:|\Z)'
                 ]
-                
+               
                 for pattern in error_patterns:
                     error_matches = re.findall(pattern, error_section, re.DOTALL | re.IGNORECASE)
                     for match in error_matches:
@@ -274,9 +288,9 @@ def parse_detailed_data_improved(response_text):
                             mistakes.append({
                                 "step": step_num,
                                 "status": "Error",
-                                "desc": error_desc.strip()  # One-liner only, no correction here
+                                "desc": error_desc.strip() # One-liner only, no correction here
                             })
-            
+           
             # Extract corrected solution
             corrected_steps = []
             if '### Corrected Solution' in section:
@@ -285,12 +299,12 @@ def parse_detailed_data_improved(response_text):
                     correct_section = correct_part.split('##')[0]
                 else:
                     correct_section = correct_part
-                
+               
                 # Extract steps from corrected solution
                 step_pattern = r'\*\*Step\s+\d+:\*\*\s*(.*?)(?=\*\*Step\s+\d+:|\*\*Final Answer|\Z)'
                 step_matches = re.findall(step_pattern, correct_section, re.DOTALL)
                 corrected_steps = [match.strip() for match in step_matches if match.strip()]
-            
+           
             # Extract final answer - PROPER MATHJAX FORMAT
             final_answer = ""
             final_match = re.search(r'\\boxed{(.*?)}', section)
@@ -304,7 +318,7 @@ def parse_detailed_data_improved(response_text):
                 else:
                     final_answer_text = answer_part.split('\n')[0].strip()
                     final_answer = f"$${final_answer_text}$$" if final_answer_text else ""
-            
+           
             questions.append({
                 "id": question_id,
                 "questionText": question_text[:500] + "..." if len(question_text) > 500 else question_text,
@@ -314,7 +328,7 @@ def parse_detailed_data_improved(response_text):
                 "correctedSteps": corrected_steps or ["Complete solution will be shown after analysis"],
                 "finalAnswer": final_answer or "Answer will be determined after analysis"
             })
-        
+       
         except Exception as e:
             logger.error(f"Error parsing question {i}: {e}")
             questions.append({
@@ -326,7 +340,7 @@ def parse_detailed_data_improved(response_text):
                 "correctedSteps": ["Solution analysis"],
                 "finalAnswer": "Answer pending"
             })
-    
+   
     return {"questions": questions}
 
 @app.post("/analyze-feedback")
@@ -336,13 +350,13 @@ async def analyze_feedback(request: dict):
         question = request.get("question", {})
         feedback = request.get("feedback", "")
         original_analysis = request.get("original_analysis", "")
-        
+       
         if not question or not feedback:
             return JSONResponse({
                 "success": False,
                 "error": "Missing question or feedback data"
             })
-        
+       
         # Create prompt for feedback analysis
         feedback_prompt = f"""
         A user has provided feedback on the analysis of Question {question.get('id', 'Unknown')}:
@@ -355,19 +369,19 @@ async def analyze_feedback(request: dict):
         3. Ensuring all mathematical expressions are in proper MathJax/LaTeX format
         Provide the updated analysis for this question only.
         """
-        
+       
         response = model.generate_content(feedback_prompt)
         updated_analysis = response.text
-        
+       
         # Parse the updated analysis to extract the question data
         updated_question = parse_single_question(updated_analysis, question.get('id', f"Q{len(question)}"))
-        
+       
         return JSONResponse({
             "success": True,
             "updated_question": updated_question,
             "message": "Analysis updated successfully"
         })
-    
+   
     except Exception as e:
         logger.error(f"Feedback analysis failed: {str(e)}")
         return JSONResponse({
@@ -414,20 +428,20 @@ async def create_practice_paper(request: dict):
     try:
         detailed_data = request.get("detailed_data", {})
         questions_with_errors = []
-        
+       
         # Include ALL questions with ANY errors (no genuine filter - pass down completely)
         for q in detailed_data.get("questions", []):
             if q.get('hasErrors', False) and q.get('mistakes'):
                 questions_with_errors.append(q)
-        
+       
         logger.info(f"Found {len(questions_with_errors)} questions with errors for practice paper")
-        
+       
         if not questions_with_errors:
             return JSONResponse({
                 "success": False,
                 "error": "No questions with errors found. Your solutions appear to be correct!"
             })
-        
+       
         # FIXED PRACTICE PAPER PROMPT - Preserves exact question numbers, redesign ALL
         practice_prompt = f"""Create a targeted practice paper with EXACTLY {len(questions_with_errors)} redesigned questions.
 **CRITICAL REQUIREMENTS:**
@@ -458,19 +472,19 @@ Evaluate $\int x^7 dx$
 - NO extra text - just "Based on Question"
 - Each question must be separated by ---
 - Focus on same mathematical concepts with different coefficients/values - redesign EVERY one provided"""
-        
+       
         response = model.generate_content(practice_prompt)
         practice_paper = response.text
-        
+       
         logger.info(f"Successfully generated practice paper with {len(questions_with_errors)} questions")
-        
+       
         return JSONResponse({
             "success": True,
             "practice_paper": practice_paper,
             "questions_used": len(questions_with_errors),
             "message": f"Practice paper created targeting {len(questions_with_errors)} error areas"
         })
-    
+   
     except Exception as e:
         logger.error(f"Practice paper creation failed: {str(e)}")
         return JSONResponse({
