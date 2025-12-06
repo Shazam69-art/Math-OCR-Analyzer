@@ -15,14 +15,26 @@ import logging
 from datetime import datetime
 import re
 from fastapi import Request
+# Add these imports (around line 8)
+import asyncio
+import httpx
+from fastapi import BackgroundTasks
+from contextlib import asynccontextmanager
 
-# Configure Gemini from environment variable
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY environment variable is not set")
+# Add this after other imports (around line 15-20)
+TIMEOUT = 300  # 5 minutes timeout for Gemini API
 
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash")
+model = genai.GenerativeModel(
+    "gemini-2.5-flash",  # Using flash model for faster response
+    generation_config={
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_output_tokens": 8192,
+    }
+)
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -78,41 +90,47 @@ async def serve_css():
 
 @app.post("/analyze-chat")
 async def analyze_chat(
-        message: str = Form(""),
-        files: List[UploadFile] = File([])
+    message: str = Form(""),
+    files: List[UploadFile] = File([]),
+    background_tasks: BackgroundTasks = None
 ):
-    """Main analysis endpoint using Gemini with IMPROVED OUTPUT FORMAT."""
+    """Main analysis endpoint with timeout handling."""
     try:
         logger.info(f"Analysis request - Message: {message[:100]}, Files: {len(files)}")
-        # ENHANCED SYSTEM PROMPT WITH CLEANER OUTPUT FORMAT - UPDATED FOR SHORT ERROR ANALYSIS AND EXACT COPY
-        # FIXED: Removed invalid escape sequences by using raw strings
+        
+        # ENHANCED SYSTEM PROMPT WITH PERFORMANCE TABLE
         system_prompt = r"""You are a **PhD-Level Math Teacher** analyzing student work.
+
 **CRITICAL INSTRUCTIONS FOR OUTPUT:**
-1. **ALL MATHEMATICAL EXPRESSIONS MUST BE IN LATEX/MATHJAX FORMAT** - Use $...$ for inline math and $$...$$ for display math. Ensure 100% proper LaTeX for rendering.
-2. **PRESERVE STUDENT'S ORIGINAL SOLUTION EXACTLY (100% COPY-PASTE)** - Copy verbatim what the student wrote from the images/files. Do not modify, interpret, or regenerate any part. If text is unclear, copy as visible.
-3. **IGNORE STRIKETHROUGH TEXT COMPLETELY** - Strikethrough indicates the student marked it as wrong; do not include it in the student's solution at all.
-4. **SEPARATE EACH QUESTION CLEARLY** - Each labeled question gets its OWN analysis section.
-5. **ERROR ANALYSIS MUST BE VERY SHORT: ONE-LINER PER ERROR ONLY** - List only the specific errors (e.g., "Step 2: Incorrect application of power rule"). NO corrections, explanations, or breakdowns here. Keep to 1 sentence max per error.
-6. **MARK QUESTIONS AS CORRECT** if student's final answer matches the correct answer, even if steps differ.
-7. **ONLY MARK ERRORS** when final answer differs significantly or when genuine mathematical mistakes exist.
-8. **DO NOT WRITE YOUR OWN ANSWERS IN STUDENT SOLUTION** - Only copy what the student actually submitted as final (ignoring strikethrough).
+1. **ALL MATHEMATICAL EXPRESSIONS MUST BE IN LATEX/MATHJAX FORMAT** - Use $...$ for inline math and $$...$$ for display math.
+2. **STUDENT SOLUTION PRESERVATION - COPY EXACTLY:** 
+   - Copy VERBATIM what the student wrote from the images
+   - If student wrote "$x^2 + 3x$", output "$x^2 + 3x$" exactly
+   - If student made mistake like "$x^2 + 3x = 5x$", output it EXACTLY
+   - DO NOT correct student mistakes in their solution section
+   - DO NOT add explanatory text like "the student wrote..."
+3. **IGNORE STRIKETHROUGH TEXT COMPLETELY**
+4. **SEPARATE EACH QUESTION CLEARLY**
+5. **ERROR ANALYSIS - SHORT AND MATHEMATICAL:**
+   - Format: "Step X: [Brief error in 5-10 words with MathJax]"
+   - Example: "Step 2: Wrong derivative: $\frac{d}{dx}x^3 = 3x^2$"
+   - NO long English explanations
+6. **QUESTION IDENTIFICATION:** If unclear from images, mark as "Question [number]"
+7. **FINAL LLM SOLUTION:** 100% complete with ALL steps
+
 **OUTPUT FORMAT - FOLLOW EXACTLY:**
-## Question [EXACT LABEL]:
-**Full Question:** [Copy EXACT question text in MathJax format]
-### Student's Solution – Exact Copy:
-**Step 1:** [Copy line 1 EXACTLY as written in MathJax - 100% verbatim from image]
-**Step 2:** [Copy line 2 EXACTLY as written in MathJax - 100% verbatim from image]
-...
+## Question [Number or Label]:
+**Question:** [Best interpretation from image in MathJax]
+### Student's Solution (Exact Copy):
+[Copy EXACTLY what student wrote, line by line in MathJax]
 ### Error Analysis:
-**Step X Error:** [One-liner error description only, e.g., "Misapplied substitution rule."]
-**Step Y Error:** [One-liner error description only.]
-...
+Step X: [Short mathematical error with MathJax]
 ### Corrected Solution:
-**Step 1:** [Mathematical setup with explanation in MathJax]
-**Step 2:** [Detailed derivation in MathJax]
+Step 1: [Complete step in MathJax]
+Step 2: [Complete step in MathJax]
 ...
-**Final Answer:** $$\boxed{final_answer}$$
----
+**Final Answer:** $$\boxed{answer}$$
+
 **PERFORMANCE TABLE (UPDATE BASED ON ACTUAL ERRORS FOUND)**
 | Concept No. | Concept (With Explanation) | Example | Status |
 |-------------|----------------------------|---------|--------|
@@ -134,9 +152,16 @@ async def analyze_chat(
 | 16 | Inverse Trigonometric By Parts | (ii) \(\int \tan^{-1} x dx\) | **Performance:** Not Tested |
 | 17 | Integrals of the form \(\int e^x [f(x) + f'(x)] dx\) | (ii) \(\int e^x \left( \frac{1}{x^2} - \frac{2}{x^3} \right) dx\) | **Performance:** Not Tested |
 | 18 | Integration of (e^x)(sinx)<br/>Where terms keeps on repeating.<br/>\( \int e^{2x} \sin x dx \) | \(\int e^{3x} \sin 4x dx\)<br/>\( \int e^{3x} \sin 4x dx\) | **Performance:** Not Tested |
-**UPDATE TABLE BASED ON ACTUAL ANALYSIS:** For each concept tested, update status like: "Performance: Tested 2 Times - Perfect 2 (Q.1, Q.3)" or "Performance: Tested 1 Time - Mistakes 1 (Q.2)"
+**UPDATE TABLE BASED ON ACTUAL ANALYSIS:** For each concept tested, update status.
 ## Performance Insights
-[Provide insights with mathematical references in MathJax where needed]"""
+[Provide insights with MathJax where needed]"""
+        
+        # Check file count for timeout prevention
+        if len(files) > 8:
+            raise HTTPException(
+                status_code=400,
+                detail="Too many files (maximum 8). Please analyze 2-3 questions at a time."
+            )
         
         # Process files
         file_contents = []
@@ -157,6 +182,9 @@ async def analyze_chat(
                     logger.error(f"Error processing file {file.filename}: {str(e)}")
                     file_descriptions.append(f"Failed to process {file.filename}: {str(e)}")
         
+        if not file_contents:
+            raise HTTPException(status_code=400, detail="No valid image files processed")
+        
         # Prepare content for Gemini
         contents = [system_prompt]
         if message:
@@ -165,14 +193,23 @@ async def analyze_chat(
         
         # Call Gemini with timeout handling
         try:
-            response = model.generate_content(contents)
+            response = await asyncio.wait_for(
+                model.generate_content_async(contents),
+                timeout=TIMEOUT
+            )
             ai_response = response.text
+        except asyncio.TimeoutError:
+            logger.error("Gemini API timeout")
+            raise HTTPException(
+                status_code=504, 
+                detail="Analysis timed out. Try with fewer files (2-3 questions maximum)."
+            )
         except Exception as genai_error:
             logger.error(f"Gemini API error: {str(genai_error)}")
-            raise HTTPException(status_code=504, detail="Analysis service is taking longer than expected. Please try again.")
+            raise HTTPException(status_code=500, detail="Analysis service error. Please try with fewer files.")
         
-        # Parse detailed data for frontend
-        detailed_data = parse_detailed_data_improved(ai_response)
+        # Parse detailed data
+        detailed_data = parse_detailed_data_fixed(ai_response)
         logger.info(f"Analysis completed. Found {len(detailed_data.get('questions', []))} questions")
         
         return JSONResponse({
@@ -181,150 +218,148 @@ async def analyze_chat(
             "detailed_data": detailed_data,
             "files_processed": file_descriptions
         })
+        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Analysis failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
-def parse_detailed_data_improved(response_text):
-    """IMPROVED parsing of AI response with better structure and error detection."""
+def parse_detailed_data_fixed(response_text):
+    """FIXED parsing that preserves student solutions exactly and keeps table."""
     questions = []
     if not response_text:
         return {"questions": questions}
     
-    # IMPROVED QUESTION PARSING - SEPARATE EACH QUESTION CLEARLY
-    question_sections = re.split(r'## Question\s+', response_text)
+    # Split response to separate questions from table
+    table_start = response_text.find("## Performance Insights")
+    if table_start == -1:
+        table_start = response_text.find("PERFORMANCE TABLE")
+    if table_start == -1:
+        table_start = len(response_text)
     
-    # Remove empty sections and header
-    question_sections = [section for section in question_sections if
-                         section.strip() and not section.startswith('Questions found')]
+    # Get questions section (before table)
+    questions_section = response_text[:table_start]
+    
+    # Split by question markers
+    question_patterns = [
+        r'## Question\s+',
+        r'## Q\.?\s*\d+',
+        r'\*\*\d+\.\*\*'
+    ]
+    
+    question_sections = []
+    for pattern in question_patterns:
+        if re.search(pattern, questions_section, re.IGNORECASE):
+            question_sections = re.split(pattern, questions_section, flags=re.IGNORECASE)
+            break
+    
+    if not question_sections or len(question_sections) < 2:
+        # Try simple split
+        question_sections = re.split(r'\n##\s+', questions_section)
+    
+    # Remove empty sections
+    question_sections = [s for s in question_sections if s.strip() and len(s.strip()) > 20]
     
     for i, section in enumerate(question_sections, 1):
         try:
-            # Extract question ID - improved pattern matching
-            question_id_match = re.search(r'^([A-Z]?[0-9]+[a-z]?(?:\([a-z]\))?[^:\n]*):?', section)
-            if question_id_match:
-                question_id = question_id_match.group(1).strip()
-            else:
-                # Try alternative patterns
-                alt_match = re.search(r'^(Q?[0-9]+[a-z]?(?:\s*\([a-z]\))?)', section)
-                question_id = alt_match.group(1).strip() if alt_match else f"Q{i}"
+            # Extract question ID
+            id_patterns = [
+                r'^([A-Z]?[0-9]+[a-z]?(?:\([a-z]\))?[^:\n]*):?',
+                r'^(Q?[0-9]+[a-z]?(?:\s*\([a-z]\))?)',
+                r'^([^:\n]+)'
+            ]
             
-            # Extract question text - CLEANED TO REMOVE STUDENT SOLUTION CONTENT
-            question_text = "Question content not extracted"
-            if '**Full Question:**' in section:
-                question_part = section.split('**Full Question:**')[1]
-                if '###' in question_part:
-                    question_text = question_part.split('###')[0].strip()
-                else:
-                    question_text = question_part.strip()
+            question_id = f"Q{i}"
+            for pattern in id_patterns:
+                id_match = re.search(pattern, section)
+                if id_match:
+                    question_id = id_match.group(1).strip()
+                    break
             
-            # Clean question text from student solution content
-            question_text = re.sub(r'### Student\'s Solution.*?###', '', question_text, flags=re.DOTALL).strip()
+            # Extract question text - SIMPLIFIED
+            question_text = "Question"
+            q_match = re.search(r'\*\*Question:\*\*\s*(.*?)(?=\n###|\n\*\*|\Z)', section, re.DOTALL)
+            if q_match:
+                question_text = q_match.group(1).strip()
+            elif '**Question:**' in section:
+                parts = section.split('**Question:**', 1)
+                if len(parts) > 1:
+                    question_text = parts[1].split('\n')[0].strip()
             
-            # Extract student work - PRESERVE EXACTLY AS SUBMITTED
-            steps = []
+            # CRITICAL: Extract student solution EXACTLY
+            student_solution = []
             if '### Student\'s Solution' in section:
-                solution_part = section.split('### Student\'s Solution')[1]
-                if '###' in solution_part:
-                    solution_section = solution_part.split('###')[0]
-                else:
-                    solution_section = solution_part
-                
-                # Extract steps exactly as written - SIMPLE PARSING
-                step_patterns = [
-                    r'\*\*Step\s+\d+:\*\*\s*(.*?)(?=\*\*Step\s+\d+:|###|\*\*Analysis|\Z)',
-                    r'Step\s+\d+:\s*(.*?)(?=Step\s+\d+:|###|\*\*Analysis|\Z)'
-                ]
-                
-                for pattern in step_patterns:
-                    step_matches = re.findall(pattern, solution_section, re.DOTALL | re.IGNORECASE)
-                    if step_matches:
-                        steps = [match.strip() for match in step_matches if match.strip()]
-                        break
+                # Get everything between Student's Solution and next section
+                sol_sections = re.split(r'### (?:Student\'s Solution|Error Analysis|Corrected Solution)', section, flags=re.IGNORECASE)
+                if len(sol_sections) > 1:
+                    student_text = sol_sections[1]
+                    # Clean but preserve math
+                    lines = [line.strip() for line in student_text.split('\n') if line.strip()]
+                    # Remove any explanatory text
+                    clean_lines = []
+                    for line in lines:
+                        if not line.startswith(('Note:', 'The student', 'Here the student', 'Student wrote:')):
+                            clean_lines.append(line)
+                    student_solution = clean_lines[:10]  # Limit to 10 lines
             
-            if not steps:
-                steps = ["No solution provided"]
+            if not student_solution or len(student_solution) == 0:
+                student_solution = ["No clear solution in image"]
             
-            # SIMPLE ERROR DETECTION - NO COMPLEX BREAKDOWNS - UPDATED FOR ONE-LINERS ONLY
+            # Extract errors - SIMPLE
             mistakes = []
-            has_errors = False
-            
-            # Look for error patterns with SIMPLE matching
             if '### Error Analysis' in section:
-                error_part = section.split('### Error Analysis')[1]
-                if '###' in error_part:
-                    error_section = error_part.split('###')[0]
-                else:
-                    error_section = error_part
-                
-                # Simple error pattern matching - ONE-LINER ONLY, NO CORRECTION EXTRACTION
-                error_patterns = [
-                    r'\*\*Step\s*(\d+)\s*Error:\*\*\s*(.*?)(?=\*\*Step\s*\d+\s*Error:|\Z)',
-                    r'Step\s*(\d+)\s*Error:\s*(.*?)(?=Step\s*\d+\s*Error:|\Z)'
-                ]
-                
-                for pattern in error_patterns:
-                    error_matches = re.findall(pattern, error_section, re.DOTALL | re.IGNORECASE)
-                    for match in error_matches:
-                        step_num, error_desc = match
+                error_sections = re.split(r'### Error Analysis:', section, flags=re.IGNORECASE)
+                if len(error_sections) > 1:
+                    error_text = error_sections[1].split('###')[0] if '###' in error_sections[1] else error_sections[1]
+                    # Find step errors
+                    step_pattern = r'Step\s*(\d+)[:\s]+(.*?)(?=Step\s*\d+|\Z)'
+                    step_matches = re.findall(step_pattern, error_text, re.DOTALL | re.IGNORECASE)
+                    for step_num, error_desc in step_matches:
                         if error_desc.strip():
-                            has_errors = True
                             mistakes.append({
                                 "step": step_num,
                                 "status": "Error",
-                                "desc": error_desc.strip()  # One-liner only, no correction here
+                                "desc": error_desc.strip()[:100]
                             })
             
             # Extract corrected solution
             corrected_steps = []
             if '### Corrected Solution' in section:
-                correct_part = section.split('### Corrected Solution')[1]
-                if '##' in correct_part:
-                    correct_section = correct_part.split('##')[0]
-                else:
-                    correct_section = correct_part
-                
-                # Extract steps from corrected solution
-                step_pattern = r'\*\*Step\s+\d+:\*\*\s*(.*?)(?=\*\*Step\s+\d+:|\*\*Final Answer|\Z)'
-                step_matches = re.findall(step_pattern, correct_section, re.DOTALL)
-                corrected_steps = [match.strip() for match in step_matches if match.strip()]
+                correct_sections = re.split(r'### Corrected Solution:', section, flags=re.IGNORECASE)
+                if len(correct_sections) > 1:
+                    correct_text = correct_sections[1].split('**Final Answer:**')[0] if '**Final Answer:**' in correct_sections[1] else correct_sections[1]
+                    # Extract steps
+                    step_matches = re.findall(r'Step\s*\d+[:\s]+(.*?)(?=Step\s*\d+|\Z)', correct_text, re.DOTALL | re.IGNORECASE)
+                    if step_matches:
+                        corrected_steps = [match.strip() for match in step_matches[:8]]
             
-            # Extract final answer - PROPER MATHJAX FORMAT
+            # Final answer
             final_answer = ""
-            final_match = re.search(r'\\boxed{(.*?)}', section)
-            if final_match:
-                final_answer = f"$$\\boxed{{{final_match.group(1)}}}$$"
-            elif '**Final Answer:**' in section:
-                answer_part = section.split('**Final Answer:**')[1]
-                if '\\boxed' in answer_part:
-                    boxed_match = re.search(r'\\boxed{(.*?)}', answer_part)
-                    final_answer = f"$$\\boxed{{{boxed_match.group(1)}}}$$" if boxed_match else ""
-                else:
-                    final_answer_text = answer_part.split('\n')[0].strip()
-                    final_answer = f"$${final_answer_text}$$" if final_answer_text else ""
+            boxed_match = re.search(r'\\boxed{(.*?)}', section)
+            if boxed_match:
+                final_answer = f"$$\\boxed{{{boxed_match.group(1)}}}$$"
             
             questions.append({
                 "id": question_id,
-                "questionText": question_text[:500] + "..." if len(question_text) > 500 else question_text,
-                "steps": steps,
+                "questionText": question_text[:400],
+                "steps": student_solution,
                 "mistakes": mistakes,
-                "hasErrors": has_errors,
-                "correctedSteps": corrected_steps or ["Complete solution will be shown after analysis"],
-                "finalAnswer": final_answer or "Answer will be determined after analysis"
+                "hasErrors": len(mistakes) > 0,
+                "correctedSteps": corrected_steps or ["Complete solution will be shown"],
+                "finalAnswer": final_answer or ""
             })
-        
+            
         except Exception as e:
             logger.error(f"Error parsing question {i}: {e}")
             questions.append({
                 "id": f"Q{i}",
                 "questionText": f"Question {i}",
-                "steps": ["Analysis in progress"],
+                "steps": ["Processing student work..."],
                 "mistakes": [],
                 "hasErrors": False,
-                "correctedSteps": ["Solution analysis"],
-                "finalAnswer": "Answer pending"
+                "correctedSteps": ["Analysis in progress"],
+                "finalAnswer": ""
             })
     
     return {"questions": questions}
@@ -488,3 +523,4 @@ def format_questions_for_practice_prompt(questions_with_errors):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+
