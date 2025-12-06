@@ -340,29 +340,152 @@
         }
 
         async function performGeneralAnalysis() {
-            const fd = new FormData();
-            questionFiles.forEach(f => fd.append('files', f));
-            solutionFiles.forEach(f => fd.append('files', f));
-            fd.append('message', 'Perform a general mathematical analysis of these papers. Identify all questions, analyze student solutions step by step, detect conceptual errors, and provide corrected solutions with proper mathematical reasoning.');
+    const fd = new FormData();
+    questionFiles.forEach(f => fd.append('files', f));
+    solutionFiles.forEach(f => fd.append('files', f));
+    fd.append('message', 'Perform a general mathematical analysis of these papers. Identify all questions, analyze student solutions step by step, detect conceptual errors, and provide corrected solutions with proper mathematical reasoning.');
+    
+    try {
+        // Show processing message
+        document.getElementById('progressMessages').innerHTML = 
+            '<div class="progress-message">📤 Uploading files and starting analysis...</div>' +
+            '<div class="progress-message">⏳ This may take a few minutes for large files...</div>' +
+            '<div class="progress-message">🔄 Analysis will continue in background...</div>';
+        
+        const r = await fetch('/analyze-chat', {method:'POST', body:fd});
+        const d = await r.json();
+        
+        if (d.status === "processing" && d.analysis_id) {
+            // Start polling for results
+            pollAnalysisStatus(d.analysis_id);
+        } else if (d.status === "success") {
+            // Immediate success (shouldn't happen with new system but keep for compatibility)
+            analysisData = d.response;
+            detailedData = d.detailed_data || { questions: [] };
             
-            try {
-                const r = await fetch('/analyze-chat', {method:'POST', body:fd});
-                const d = await r.json();
-                analysisData = d.response;
-                detailedData = d.detailed_data || { questions: [] };
-                
-                // Force MathJax rendering
-                if (window.MathJax) {
-                    setTimeout(() => {
-                        MathJax.typesetPromise();
-                    }, 1000);
-                }
-            } catch (e) {
-                console.error(e);
-                alert('Analysis failed. Please try again.');
+            document.getElementById('progressSection').style.display = 'none';
+            document.getElementById('analysisCompleteSection').style.display = 'block';
+            document.getElementById('conceptGapsBtn').disabled = false;
+            document.getElementById('detailedAnalysisBtn').disabled = false;
+            document.getElementById('createPaperBtn').disabled = false;
+            
+            // Force MathJax rendering
+            if (window.MathJax) {
+                setTimeout(() => {
+                    MathJax.typesetPromise();
+                }, 1000);
             }
+        } else {
+            throw new Error(d.message || 'Analysis failed');
         }
+    } catch (e) {
+        console.error(e);
+        document.getElementById('progressMessages').innerHTML += 
+            `<div class="progress-message" style="color: #e74c3c;">❌ Error: ${e.message}</div>`;
+        
+        setTimeout(() => {
+            document.getElementById('progressSection').style.display = 'none';
+            alert('Analysis failed: ' + e.message);
+        }, 3000);
+    }
+}
+function pollAnalysisStatus(analysisId) {
+    let attempts = 0;
+    const maxAttempts = 120; // 10 minutes (5 seconds * 120 = 600 seconds)
+    
+    function checkStatus() {
+        attempts++;
+        
+        fetch(`/analysis-status/${analysisId}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === "completed") {
+                    // Analysis complete!
+                    analysisData = data.response;
+                    detailedData = data.detailed_data || { questions: [] };
+                    
+                    document.getElementById('progressMessages').innerHTML += 
+                        '<div class="progress-message">✅ Analysis completed successfully!</div>' +
+                        '<div class="progress-message">📊 Generating reports...</div>';
+                    
+                    setTimeout(() => {
+                        document.getElementById('progressSection').style.display = 'none';
+                        document.getElementById('analysisCompleteSection').style.display = 'block';
+                        document.getElementById('conceptGapsBtn').disabled = false;
+                        document.getElementById('detailedAnalysisBtn').disabled = false;
+                        document.getElementById('createPaperBtn').disabled = false;
+                        
+                        // Force MathJax rendering
+                        if (window.MathJax) {
+                            setTimeout(() => {
+                                MathJax.typesetPromise();
+                            }, 1000);
+                        }
+                    }, 2000);
+                    
+                } else if (data.status === "error") {
+                    // Analysis failed
+                    document.getElementById('progressMessages').innerHTML += 
+                        `<div class="progress-message" style="color: #e74c3c;">❌ Analysis failed: ${data.error || 'Unknown error'}</div>`;
+                    
+                    setTimeout(() => {
+                        document.getElementById('progressSection').style.display = 'none';
+                        alert('Analysis failed. Please try again with fewer files.');
+                    }, 3000);
+                    
+                } else if (data.status === "processing") {
+                    // Still processing
+                    const dots = '.'.repeat((attempts % 4) + 1);
+                    document.getElementById('progressMessages').innerHTML = 
+                        `<div class="progress-message">🔄 Analyzing files${dots}</div>` +
+                        `<div class="progress-message">⏳ ${attempts * 5} seconds elapsed</div>` +
+                        `<div class="progress-message">📄 Processing ${data.message || 'files'}</div>` +
+                        `<div class="progress-message">💡 Analysis continues in background</div>`;
+                    
+                    // Scroll to bottom
+                    const messagesContainer = document.getElementById('progressMessages');
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    
+                    if (attempts < maxAttempts) {
+                        // Check again in 5 seconds
+                        setTimeout(checkStatus, 5000);
+                    } else {
+                        // Timeout after 10 minutes
+                        document.getElementById('progressMessages').innerHTML += 
+                            '<div class="progress-message" style="color: #e74c3c;">⏰ Analysis taking too long. Please check back later.</div>';
+                        
+                        setTimeout(() => {
+                            document.getElementById('progressSection').style.display = 'none';
+                            alert('Analysis is taking longer than expected. The analysis continues in background. You can check back later.');
+                        }, 3000);
+                    }
+                }
+            })
+            .catch(e => {
+                console.error('Status check failed:', e);
+                
+                if (attempts < maxAttempts) {
+                    setTimeout(checkStatus, 10000); // Wait 10 seconds on error
+                } else {
+                    document.getElementById('progressMessages').innerHTML += 
+                        '<div class="progress-message" style="color: #e74c3c;">❌ Could not check analysis status</div>';
+                    
+                    setTimeout(() => {
+                        document.getElementById('progressSection').style.display = 'none';
+                        alert('Could not check analysis status. Please try again.');
+                    }, 3000);
+                }
+            });
+    }
+    
+    // Start polling
+    setTimeout(checkStatus, 3000);
+}
 
+
+
+
+        
         async function performAnalysis() {
             const fd = new FormData();
             questionFiles.forEach(f => fd.append('files', f));
