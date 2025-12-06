@@ -37,17 +37,17 @@
                 <div class="upload-buttons">
                     <button id="uploadQuestionBtn" class="btn upload-btn">
                         <span class="btn-icon">📄</span>
-                        Upload Question Paper
+                        Upload Question Paper (Images Only)
                         <span id="questionCount" class="file-count"></span>
                     </button>
                     <button id="uploadSolutionBtn" class="btn upload-btn">
                         <span class="btn-icon">✍️</span>
-                        Upload Your Solution
+                        Upload Your Solution (Images Only)
                         <span id="solutionCount" class="file-count"></span>
                     </button>
                 </div>
-                <input type="file" id="questionInput" hidden multiple accept=".pdf,.jpg,.jpeg,.png" />
-                <input type="file" id="solutionInput" hidden multiple accept=".pdf,.jpg,.jpeg,.png" />
+                <input type="file" id="questionInput" hidden multiple accept=".jpg,.jpeg,.png" />
+                <input type="file" id="solutionInput" hidden multiple accept=".jpg,.jpeg,.png" />
                 
                 <div class="dropdown-section">
                     <label>Select Class and Topic (Optional):</label>
@@ -230,6 +230,16 @@
         document.getElementById('generalAnalysisBtn').onclick = async () => {
             if (questionFiles.length === 0 || solutionFiles.length === 0) {
                 alert('Please upload both question paper and solution files first.');
+                return;
+            }
+            
+            // Check for PDF files and warn user
+            const hasPDF = [...questionFiles, ...solutionFiles].some(file => 
+                file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+            );
+            
+            if (hasPDF) {
+                alert('PDF files are not supported in the current configuration. Please convert your PDFs to images (JPG/PNG) and try again.');
                 return;
             }
             
