@@ -29,7 +29,6 @@
             <h1>CAS Educations - Math OCR Analyzer</h1>
             <p>Advanced mathematical analysis with real-time feedback</p>
         </div>
-
         <!-- Main Interface -->
         <div id="mainInterface" class="section main-interface">
             <!-- Upload Section -->
@@ -48,7 +47,7 @@
                 </div>
                 <input type="file" id="questionInput" hidden multiple accept=".jpg,.jpeg,.png" />
                 <input type="file" id="solutionInput" hidden multiple accept=".jpg,.jpeg,.png" />
-                
+               
                 <div class="dropdown-section">
                     <label>Select Class and Topic (Optional):</label>
                     <select id="classTopicDropdown" class="dropdown">
@@ -68,7 +67,7 @@
                         </div>
                     </div>
                 </div>
-                
+               
                 <!-- Analysis Buttons -->
                 <div class="analysis-buttons">
                     <button id="generalAnalysisBtn" class="btn primary-btn" disabled>
@@ -76,7 +75,7 @@
                         Start General Analysis
                     </button>
                 </div>
-                
+               
                 <div id="confirmationSection" class="confirmation-section" style="display:none;">
                     <p id="confirmationMessage"></p>
                     <div class="confirmation-buttons">
@@ -84,7 +83,7 @@
                         <button id="beginNo" class="btn cancel-btn">No, Go Back</button>
                     </div>
                 </div>
-                
+               
                 <div id="progressSection" class="progress-section" style="display:none;">
                     <div class="progress-container">
                         <h3>Analyzing your work...</h3>
@@ -95,7 +94,7 @@
                         <div id="progressMessages" class="progress-messages"></div>
                     </div>
                 </div>
-                
+               
                 <div id="analysisCompleteSection" class="complete-section" style="display:none;">
                     <div class="success-message">
                         <span class="success-icon">✓</span>
@@ -103,7 +102,6 @@
                     </div>
                 </div>
             </div>
-
             <!-- Report Buttons -->
             <div class="section report-section">
                 <h3>Generate Reports:</h3>
@@ -123,7 +121,6 @@
                 </div>
             </div>
         </div>
-
         <!-- Performance Report Screen -->
         <div id="conceptGapsScreen" class="section report-screen">
             <div class="report-header">
@@ -134,7 +131,6 @@
             </div>
             <div id="conceptGapsContent" class="report-content"></div>
         </div>
-
         <!-- Detailed Analysis Screen -->
         <div id="detailedAnalysisScreen" class="section report-screen">
             <div class="report-header">
@@ -145,7 +141,6 @@
             </div>
             <div id="detailedContent" class="detailed-content"></div>
         </div>
-
         <!-- Practice Paper Screen -->
         <div id="practicePaperScreen" class="section report-screen">
             <div class="report-header">
@@ -157,38 +152,35 @@
             <div id="practicePaperContent" class="practice-content"></div>
         </div>
     </div>
-
     <script>
         let questionFiles = [], solutionFiles = [], selectedChapter = '', analysisData = {}, detailedData = {}, practicePaperData = null;
         let streamingEnabled = true;
-
         function selectChapter(chapterValue, chapterName) {
             selectedChapter = chapterValue;
-            document.getElementById('confirmationMessage').innerHTML = 
+            document.getElementById('confirmationMessage').innerHTML =
                 `Chapter <strong>${chapterName}</strong> selected! <br>Begin the analysis process?`;
             document.getElementById('confirmationSection').style.display = 'block';
             document.getElementById('class12Submenu').style.display = 'none';
         }
-
         // Upload buttons
         document.getElementById('uploadQuestionBtn').onclick = () => document.getElementById('questionInput').click();
-        document.getElementById('questionInput').onchange = e => { 
-            questionFiles = Array.from(e.target.files); 
-            updateUploadStatus('question'); 
+        document.getElementById('questionInput').onchange = e => {
+            questionFiles = Array.from(e.target.files);
+            updateUploadStatus('question');
             checkAnalysisReady();
         };
         document.getElementById('uploadSolutionBtn').onclick = () => document.getElementById('solutionInput').click();
-        document.getElementById('solutionInput').onchange = e => { 
-            solutionFiles = Array.from(e.target.files); 
-            updateUploadStatus('solution'); 
+        document.getElementById('solutionInput').onchange = e => {
+            solutionFiles = Array.from(e.target.files);
+            updateUploadStatus('solution');
             checkAnalysisReady();
         };
-        
+       
         function updateUploadStatus(type) {
             const btn = document.getElementById(type === 'question' ? 'uploadQuestionBtn' : 'uploadSolutionBtn');
             const count = (type === 'question' ? questionFiles : solutionFiles).length;
             const countSpan = document.getElementById(type === 'question' ? 'questionCount' : 'solutionCount');
-            
+           
             if (count > 0) {
                 countSpan.textContent = ` (${count})`;
                 countSpan.style.display = 'inline';
@@ -196,13 +188,12 @@
                 countSpan.style.display = 'none';
             }
         }
-
         function checkAnalysisReady() {
             const generalBtn = document.getElementById('generalAnalysisBtn');
             const conceptBtn = document.getElementById('conceptGapsBtn');
             const detailedBtn = document.getElementById('detailedAnalysisBtn');
             const paperBtn = document.getElementById('createPaperBtn');
-            
+           
             if (questionFiles.length > 0 && solutionFiles.length > 0) {
                 generalBtn.disabled = false;
                 document.getElementById('classTopicDropdown').disabled = false;
@@ -214,7 +205,6 @@
                 generalBtn.disabled = true;
             }
         }
-
         // Dropdown handling
         document.getElementById('classTopicDropdown').onchange = function() {
             const submenu = document.getElementById('class12Submenu');
@@ -225,56 +215,52 @@
                 selectedChapter = '';
             }
         };
-
         // General Analysis Button
         document.getElementById('generalAnalysisBtn').onclick = async () => {
             if (questionFiles.length === 0 || solutionFiles.length === 0) {
                 alert('Please upload both question paper and solution files first.');
                 return;
             }
-            
+           
             // Check for PDF files and warn user
-            const hasPDF = [...questionFiles, ...solutionFiles].some(file => 
+            const hasPDF = [...questionFiles, ...solutionFiles].some(file =>
                 file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
             );
-            
+           
             if (hasPDF) {
                 alert('PDF files are not supported in the current configuration. Please convert your PDFs to images (JPG/PNG) and try again.');
                 return;
             }
-            
+           
             document.getElementById('confirmationSection').style.display = 'none';
             document.getElementById('progressSection').style.display = 'block';
             startProgressAnimation();
-            
+           
             await performGeneralAnalysis();
-            
+           
             document.getElementById('progressSection').style.display = 'none';
             document.getElementById('analysisCompleteSection').style.display = 'block';
             document.getElementById('conceptGapsBtn').disabled = false;
             document.getElementById('detailedAnalysisBtn').disabled = false;
             document.getElementById('createPaperBtn').disabled = false;
         };
-
         // Confirmation for specific analysis
         document.getElementById('beginYes').onclick = async () => {
             document.getElementById('confirmationSection').style.display = 'none';
             document.getElementById('progressSection').style.display = 'block';
             startProgressAnimation();
-            
+           
             await performAnalysis();
-            
+           
             document.getElementById('progressSection').style.display = 'none';
             document.getElementById('analysisCompleteSection').style.display = 'block';
             document.getElementById('conceptGapsBtn').disabled = false;
             document.getElementById('detailedAnalysisBtn').disabled = false;
             document.getElementById('createPaperBtn').disabled = false;
         };
-
         document.getElementById('beginNo').onclick = () => {
             document.getElementById('confirmationSection').style.display = 'none';
         };
-
         // Progress animation with streaming effect
         function startProgressAnimation() {
             const messages = [
@@ -299,27 +285,27 @@
                 "Verifying partial fractions...",
                 "Generating comprehensive report..."
             ];
-            
+           
             const progressFill = document.querySelector('.progress-fill');
             const messagesContainer = document.getElementById('progressMessages');
             let currentMessage = 0;
-            
+           
             progressFill.style.width = '0%';
             messagesContainer.innerHTML = '';
-            
+           
             const interval = setInterval(() => {
                 if (currentMessage < messages.length) {
                     const messageDiv = document.createElement('div');
                     messageDiv.className = 'progress-message';
-                    
+                   
                     // Create streaming effect
                     const text = messages[currentMessage];
                     let charIndex = 0;
-                    
+                   
                     messageDiv.textContent = '• ';
                     messagesContainer.appendChild(messageDiv);
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    
+                   
                     const typeInterval = setInterval(() => {
                         if (charIndex < text.length) {
                             messageDiv.textContent = '• ' + text.substring(0, charIndex + 1);
@@ -328,29 +314,29 @@
                             clearInterval(typeInterval);
                         }
                     }, 30);
-                    
+                   
                     const progress = ((currentMessage + 1) / messages.length) * 100;
                     progressFill.style.width = `${progress}%`;
-                    
+                   
                     currentMessage++;
                 } else {
                     clearInterval(interval);
                 }
             }, 1200);
         }
-
         async function performGeneralAnalysis() {
             const fd = new FormData();
             questionFiles.forEach(f => fd.append('files', f));
             solutionFiles.forEach(f => fd.append('files', f));
+            fd.append('question_count', questionFiles.length);
             fd.append('message', 'Perform a general mathematical analysis of these papers. Identify all questions, analyze student solutions step by step, detect conceptual errors, and provide corrected solutions with proper mathematical reasoning.');
-            
+           
             try {
                 const r = await fetch('/analyze-chat', {method:'POST', body:fd});
                 const d = await r.json();
                 analysisData = d.response;
                 detailedData = d.detailed_data || { questions: [] };
-                
+               
                 // Force MathJax rendering
                 if (window.MathJax) {
                     setTimeout(() => {
@@ -362,19 +348,19 @@
                 alert('Analysis failed. Please try again.');
             }
         }
-
         async function performAnalysis() {
             const fd = new FormData();
             questionFiles.forEach(f => fd.append('files', f));
             solutionFiles.forEach(f => fd.append('files', f));
+            fd.append('question_count', questionFiles.length);
             fd.append('message', `Analyze for ${selectedChapter}`);
-            
+           
             try {
                 const r = await fetch('/analyze-chat', {method:'POST', body:fd});
                 const d = await r.json();
                 analysisData = d.response;
                 detailedData = d.detailed_data || { questions: [] };
-                
+               
                 // Force MathJax rendering
                 if (window.MathJax) {
                     setTimeout(() => {
@@ -386,23 +372,19 @@
                 alert('Analysis failed. Please try again.');
             }
         }
-
         // Report buttons
         document.getElementById('conceptGapsBtn').onclick = () => {
             showScreen('conceptGapsScreen');
             renderPerformanceReport();
         };
-
         document.getElementById('detailedAnalysisBtn').onclick = () => {
             showScreen('detailedAnalysisScreen');
             renderDetailedAnalysis();
         };
-
         document.getElementById('createPaperBtn').onclick = async () => {
             showScreen('practicePaperScreen');
             await generatePracticePaper();
         };
-
         // Navigation functions
         function showScreen(screenId) {
             document.querySelectorAll('.report-screen, .main-interface').forEach(el => {
@@ -410,34 +392,31 @@
             });
             document.getElementById(screenId).style.display = 'block';
         }
-
         function showMainInterface() {
             document.querySelectorAll('.report-screen').forEach(el => {
                 el.style.display = 'none';
             });
             document.getElementById('mainInterface').style.display = 'block';
         }
-
         // Back buttons
-        document.getElementById('backToAnalysis').onclick = 
-        document.getElementById('backToAnalysisDetailed').onclick = 
+        document.getElementById('backToAnalysis').onclick =
+        document.getElementById('backToAnalysisDetailed').onclick =
         document.getElementById('backToAnalysisPractice').onclick = showMainInterface;
-
         // Performance Report Rendering with streaming effect - FIXED TABLE SEPARATION
         function renderPerformanceReport() {
             const content = document.getElementById('conceptGapsContent');
             content.innerHTML = '<div class="streaming-placeholder">Generating performance report...</div>';
-            
+           
             setTimeout(() => {
                 if (!analysisData) {
                     content.innerHTML = '<p>No analysis data available.</p>';
                     return;
                 }
-                
+               
                 // Extract table from analysis data - FIXED: Separate table from insights
                 const tableMatch = analysisData.match(/\| Concept No\. \| Concept.*?(?=## Performance Insights|\|\s*$)/s);
                 let tableHTML = '<p>Performance data not available</p>';
-                
+               
                 if (tableMatch) {
                     tableHTML = `
                         <div class="performance-table-container">
@@ -458,7 +437,7 @@
                         </div>
                     `;
                 }
-                
+               
                 // Extract insights - FIXED: Separate from table
                 const insightsMatch = analysisData.match(/## Performance Insights[\s\S]*$/);
                 let insightsHTML = '';
@@ -471,9 +450,9 @@
                         </div>
                     `;
                 }
-                
+               
                 content.innerHTML = tableHTML + insightsHTML;
-                
+               
                 // Render MathJax
                 if (window.MathJax) {
                     setTimeout(() => {
@@ -482,23 +461,22 @@
                 }
             }, 800);
         }
-
         function parsePerformanceTable(tableText) {
             const rows = tableText.split('\n').filter(line => line.trim().startsWith('|'));
             let tableHTML = '';
-            
+           
             rows.forEach((row, index) => {
                 if (index < 2) return; // Skip header and separator
-                
+               
                 const cells = row.split('|').filter(cell => cell.trim() !== '');
                 if (cells.length >= 4) {
                     const conceptNumber = cells[0].trim();
                     const conceptText = cells[1].trim();
                     const exampleText = cells[2].trim();
                     const statusText = cells[3].trim();
-                    
+                   
                     const statusClass = getStatusClass(statusText);
-                    
+                   
                     tableHTML += `
                         <tr>
                             <td><strong>${conceptNumber}</strong></td>
@@ -512,10 +490,9 @@
                     `;
                 }
             });
-            
+           
             return tableHTML;
         }
-
         function getStatusClass(statusText) {
             const text = statusText.toLowerCase();
             if (text.includes('perfect') || text.includes('100%') || text.includes('excellent')) return 'perfect';
@@ -524,25 +501,24 @@
             if (text.includes('not tested')) return 'not-tested';
             return '';
         }
-
         // Detailed Analysis Rendering with streaming effect and improved structure
         function renderDetailedAnalysis() {
             const content = document.getElementById('detailedContent');
             content.innerHTML = '<div class="streaming-placeholder">Generating detailed analysis...</div>';
-            
+           
             setTimeout(() => {
                 content.innerHTML = '';
-                
+               
                 if (!detailedData.questions || detailedData.questions.length === 0) {
                     content.innerHTML = '<p>No questions analyzed yet.</p>';
                     return;
                 }
-                
+               
                 detailedData.questions.forEach(q => {
                     const hasErrors = q.hasErrors && q.mistakes && q.mistakes.length > 0;
                     const section = document.createElement('div');
                     section.className = 'question-analysis';
-                    
+                   
                     section.innerHTML = `
                         <div class="question-header" onclick="toggleQuestion('${q.id}')">
                             <span class="question-title">${q.id} - Question Analysis</span>
@@ -557,25 +533,25 @@
                                 <h4>📝 Question:</h4>
                                 <div class="math-expression">${formatMathContent(q.questionText)}</div>
                             </div>
-                            
+                           
                             <!-- Student's Solution - EXACTLY as submitted -->
                             <div class="analysis-section student-work">
                                 <h4>✍️ Student's Solution:</h4>
-                                ${q.steps && q.steps.length > 0 && q.steps[0] !== "No solution provided" ? 
+                                ${q.steps && q.steps.length > 0 && q.steps[0] !== "No solution provided" ?
                                     q.steps.map((step, index) => `
                                         <div class="step-item">
                                             <strong>Step ${index + 1}:</strong><br>
                                             <div class="math-expression original-solution">${formatMathContent(step)}</div>
                                         </div>
-                                    `).join('') : 
+                                    `).join('') :
                                     '<div class="step-item">No solution provided</div>'
                                 }
                             </div>
-                            
+                           
                             <!-- Error Analysis - SIMPLE AND PRECISE -->
                             <div class="analysis-section error-analysis">
                                 <h4>🔍 Error Analysis:</h4>
-                                ${hasErrors 
+                                ${hasErrors
                                     ? q.mistakes.map(m => `
                                         <div class="step-item error-item">
                                             <div class="error-step">Step ${m.step}:</div>
@@ -594,7 +570,7 @@
                                        </div>`
                                 }
                             </div>
-                            
+                           
                             <!-- Correct Solution -->
                             <div class="analysis-section correct-solution">
                                 <h4>✅ Correct Solution:</h4>
@@ -609,7 +585,7 @@
                     `;
                     content.appendChild(section);
                 });
-                
+               
                 // Render MathJax
                 if (window.MathJax) {
                     setTimeout(() => {
@@ -618,17 +594,16 @@
                 }
             }, 800);
         }
-
         function toggleQuestion(id) {
             const content = document.getElementById('content-' + id);
             const isHidden = content.style.display === 'none';
             content.style.display = isHidden ? 'block' : 'none';
-            
+           
             // Update arrow
             const header = content.previousElementSibling;
             const arrow = header.querySelector('.toggle-icon');
             arrow.textContent = isHidden ? '▲' : '▼';
-            
+           
             // Render MathJax when expanding
             if (isHidden && window.MathJax) {
                 setTimeout(() => {
@@ -636,31 +611,30 @@
                 }, 300);
             }
         }
-
         // Practice Paper Generation - FIXED loading and question number issues
         async function generatePracticePaper() {
             const content = document.getElementById('practicePaperContent');
             content.innerHTML = '<div class="streaming-placeholder">🔍 Generating targeted practice paper based on your conceptual errors...</div>';
-            
+           
             try {
                 // Filter questions with genuine medium/high-level errors
                 const questionsWithGenuineErrors = detailedData.questions.filter(q => {
                     if (!q.hasErrors || !q.mistakes || q.mistakes.length === 0) return false;
-                    
+                   
                     // Check if there are genuine conceptual errors (not just minor deviations)
                     const hasGenuineErrors = q.mistakes.some(m => {
                         const desc = (m.desc || m.error || '').toLowerCase();
                         // Filter out minor errors and focus on conceptual mistakes
-                        return !desc.includes('minor') && 
-                               !desc.includes('formatting') && 
+                        return !desc.includes('minor') &&
+                               !desc.includes('formatting') &&
                                !desc.includes('presentation') &&
-                               desc.includes('concept') || desc.includes('method') || 
+                               desc.includes('concept') || desc.includes('method') ||
                                desc.includes('approach') || desc.includes('incorrect');
                     });
-                    
+                   
                     return hasGenuineErrors;
                 });
-                
+               
                 if (questionsWithGenuineErrors.length === 0) {
                     content.innerHTML = `
                         <div class="no-errors-message">
@@ -672,7 +646,7 @@
                     `;
                     return;
                 }
-                
+               
                 const response = await fetch('/create-practice-paper', {
                     method: 'POST',
                     headers: {
@@ -682,13 +656,13 @@
                         detailed_data: { questions: questionsWithGenuineErrors }
                     })
                 });
-                
+               
                 if (!response.ok) {
                     throw new Error('Failed to generate practice paper');
                 }
-                
+               
                 const data = await response.json();
-                
+               
                 if (data.success) {
                     practicePaperData = data.practice_paper;
                     renderPracticePaper();
@@ -700,15 +674,14 @@
                 content.innerHTML = `<p class="error">Error generating practice paper: ${e.message}</p>`;
             }
         }
-
        function renderPracticePaper() {
     const content = document.getElementById('practicePaperContent');
-    
+   
     if (!practicePaperData) {
         content.innerHTML = '<p>No practice paper data available.</p>';
         return;
     }
-    
+   
     // Parse and render questions with CORRECT question numbers
     let practiceHTML = `
         <div class="practice-info">
@@ -717,30 +690,30 @@
         </div>
         <div class="practice-questions-container">
     `;
-    
+   
     // IMPROVED PARSING - Handle different question number formats
     const questionBlocks = practicePaperData.split(/(?=### Based on Your Work in Question)/);
     let questionCount = 0;
-    
+   
     questionBlocks.forEach((block) => {
         if (!block.includes('### Based on Your Work in Question')) return;
-        
+       
         questionCount++;
-        
+       
         // FIXED: Better regex to capture various question number formats
         const questionMatch = block.match(/### Based on Your Work in Question\s+([^:\n]+)/);
         const originalMatch = block.match(/Original Question:\s*(.*?)(?=Modified Question|$)/s);
         const modifiedMatch = block.match(/Modified Question:\s*(.*?)(?=### Based on Your Work|$)/s);
-        
+       
         if (questionMatch && originalMatch && modifiedMatch) {
             const questionNumber = questionMatch[1].trim();
             const originalQuestion = originalMatch[1].trim();
             const modifiedQuestion = modifiedMatch[1].trim();
-            
+           
             practiceHTML += `
                 <div class="practice-question">
                     <div class="question-header-line">
-                        <strong>Practice Question ${questionCount}</strong> 
+                        <strong>Practice Question ${questionCount}</strong>
                         <span class="based-on-text">(Based on Question ${questionNumber})</span>
                     </div>
                     <div class="question-content-grid">
@@ -761,9 +734,9 @@
             `;
         }
     });
-    
+   
     practiceHTML += '</div>';
-    
+   
     if (questionCount === 0) {
         // Fallback parsing if main method fails
         practiceHTML = `
@@ -776,9 +749,9 @@
             </div>
         `;
     }
-    
+   
     content.innerHTML = practiceHTML;
-    
+   
     // Force MathJax rendering
     if (window.MathJax) {
         setTimeout(() => {
@@ -788,16 +761,15 @@
         }, 100);
     }
 }
-
         // Fallback function to extract questions if main parsing fails
         function extractQuestionsFromText(text) {
             const questions = [];
             const lines = text.split('\n');
             let currentQuestion = null;
-            
+           
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
-                
+               
                 // Look for question patterns
                 if (line.includes('Original Question:') || line.includes('Modified Question:')) {
                     if (line.includes('Original Question:')) {
@@ -818,18 +790,17 @@
                     }
                 }
             }
-            
+           
             if (currentQuestion && currentQuestion.original) {
                 questions.push(currentQuestion);
             }
-            
+           
             return questions;
         }
-
         // IMPROVED MATH FORMATTING FUNCTION
         function formatMathContent(text) {
             if (!text) return '';
-            
+           
             // Enhanced LaTeX preservation for perfect MathJax rendering
             let formatted = text
                 // Preserve all LaTeX commands
@@ -909,16 +880,15 @@
                 .replace(/\\forall/g, '\\forall')
                 .replace(/\\exists/g, '\\exists')
                 .replace(/\\nexists/g, '\\nexists');
-            
+           
             // Format text elements while preserving math
             formatted = formatted
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\n/g, '<br>')
                 .replace(/\-{3,}/g, '<hr>');
-                
+               
             return formatted;
         }
-
         // Initialize
         showMainInterface();
     </script>
