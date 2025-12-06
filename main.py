@@ -149,7 +149,7 @@ async def analyze_chat(
                 logger.error(f"Error processing {file.filename}: {str(e)}")
                 file_descriptions.append(f"Failed to process {file.filename}")
         
-        if not file_contents:
+              if not file_contents:
             return JSONResponse({
                 "status": "error",
                 "message": "No valid image files processed. Please upload JPG/PNG images."
@@ -159,7 +159,7 @@ async def analyze_chat(
         analysis_id = hashlib.md5(f"{datetime.now().timestamp()}{len(files)}".encode()).hexdigest()[:12]
         
         # Prepare content for Gemini
-    system_prompt = r"""You are a **PhD-Level Math Teacher** analyzing student work.
+        system_prompt = r"""You are a **PhD-Level Math Teacher** analyzing student work.
 **CRITICAL INSTRUCTIONS FOR OUTPUT:**
 1. **ALL MATHEMATICAL EXPRESSIONS MUST BE IN LATEX/MATHJAX FORMAT** - Use $...$ for inline math and $$...$$ for display math. Ensure 100% proper LaTeX for rendering.
 2. **PRESERVE STUDENT'S ORIGINAL SOLUTION EXACTLY (100% COPY-PASTE)** - Copy verbatim what the student wrote from the images/files. Do not modify, interpret, or regenerate any part. If text is unclear, copy as visible.
@@ -272,7 +272,6 @@ async def analyze_chat(
             "status": "error",
             "message": f"Analysis failed to start: {str(e)}"
         })
-
 @app.get("/analysis-status/{analysis_id}")
 async def get_analysis_status(analysis_id: str):
     """Check status of an analysis."""
@@ -634,3 +633,4 @@ async def startup_event():
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+
