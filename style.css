@@ -417,6 +417,7 @@ body {
 /* Detailed Analysis Styles */
 .detailed-content {
     padding: 20px;
+    font-size: 18px; /* Increased font size for better visibility */
 }
 .streaming-placeholder {
     text-align: center;
@@ -485,7 +486,7 @@ body {
 .analysis-section h4 {
     color: var(--primary-color);
     margin-bottom: 15px;
-    font-size: 16px;
+    font-size: 18px;
     border-left: 4px solid var(--secondary-color);
     padding-left: 12px;
 }
@@ -507,40 +508,23 @@ body {
 .correct-solution h4 {
     border-left-color: var(--success-color);
 }
-.solution-box {
+.section-box {
+    padding: 18px;
+    margin: 15px 0;
     background: var(--white);
-    border: 1px solid var(--medium-gray);
     border-radius: var(--border-radius);
-    padding: 15px;
-    margin-top: 15px;
-}
-.error-box {
-    background: var(--white);
     border: 1px solid var(--medium-gray);
-    border-radius: var(--border-radius);
-    padding: 15px;
-    margin-top: 15px;
-}
-.step-item {
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid var(--medium-gray);
-}
-.step-item:last-child {
-    border-bottom: none;
-}
-.math-expression {
-    font-size: 16px !important;
-    line-height: 1.8;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    line-height: 1.6;
+    font-size: 18px; /* Increased font size */
 }
 .original-solution {
     background: #f8f9fa;
     border-left: 4px solid #6c757d;
     padding: 15px;
 }
-.error-item {
+.error-content {
     background: #fff5f5;
-    border: 1px solid #fed7d7;
     color: #c53030;
     border-left: 4px solid #e53e3e;
 }
@@ -550,18 +534,20 @@ body {
 }
 .error-desc {
     margin-bottom: 10px;
-    font-size: 14px;
+    font-size: 16px;
 }
 .correction {
     margin-top: 10px;
     padding-top: 10px;
     border-top: 1px dashed #fed7d7;
 }
-.correct-item {
+.correct-content {
     background: #f0fff4;
-    border: 1px solid #c6f6d5;
     color: #276749;
     border-left: 4px solid #38a169;
+}
+.step-content {
+    margin-bottom: 10px;
 }
 /* Practice Paper Styles */
 .practice-info {
@@ -650,7 +636,7 @@ body {
 /* Math Rendering Styles */
 .math-expression {
     font-family: "Cambria Math", "Times New Roman", serif;
-    font-size: 16px;
+    font-size: 18px; /* Increased font size */
     margin: 15px 0;
     padding: 18px;
     background: var(--white);
@@ -677,7 +663,7 @@ body {
     display: block;
     margin: 20px auto;
     text-align: center;
-    font-size: 18px;
+    font-size: 20px; /* Increased for visibility */
 }
 .math-inline-pdf {
     font-family: "Cambria Math", "Times New Roman", serif;
@@ -701,62 +687,62 @@ sub {
         padding: 0;
         margin: 10px;
     }
-
+ 
     .header {
         padding: 20px;
     }
-
+ 
     .header h1 {
         font-size: 1.8em;
     }
-
+ 
     .section {
         padding: 20px;
     }
-
+ 
     .upload-buttons {
         flex-direction: column;
-        align-items: center;
+        flex-direction: column;
     }
-
+ 
     .upload-btn {
         width: 100%;
         max-width: 300px;
     }
-
+ 
     .control-buttons {
         flex-direction: column;
     }
-
+ 
     .performance-table {
         font-size: 12px;
     }
-
+ 
     .performance-table th,
     .performance-table td {
         padding: 10px 8px;
     }
-
+ 
     .math-expression {
-        font-size: 14px;
+        font-size: 16px;
         padding: 12px;
     }
-
+ 
     .question-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
     }
-
+ 
     .question-status {
         align-self: flex-start;
     }
-
+ 
     .question-content-grid {
         grid-template-columns: 1fr;
         gap: 15px;
     }
-
+ 
     .practice-question {
         padding: 15px;
     }
@@ -765,31 +751,32 @@ sub {
     body {
         padding: 10px;
     }
-
+ 
     .header h1 {
         font-size: 1.5em;
     }
-
+ 
     .confirmation-buttons {
         flex-direction: column;
     }
-
+ 
     .analysis-section {
         padding: 15px;
     }
-
-    .step-item {
+ 
+    .section-box {
         padding: 12px;
+        font-size: 16px;
     }
-
+ 
     .performance-table-container {
         margin: 15px -10px;
     }
-
+ 
     .performance-table {
         font-size: 11px;
     }
-
+ 
     .performance-table th,
     .performance-table td {
         padding: 8px 5px;
@@ -800,12 +787,12 @@ sub {
     .no-print {
         display: none !important;
     }
-
+ 
     .math-expression {
         break-inside: avoid;
         page-break-inside: avoid;
     }
-
+ 
     .question-analysis {
         break-inside: avoid;
         page-break-inside: avoid;
