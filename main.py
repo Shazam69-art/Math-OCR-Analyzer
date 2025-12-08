@@ -120,15 +120,15 @@ async def analyze_chat(
 **CRITICAL INSTRUCTIONS FOR OUTPUT (FOLLOW STRICTLY TO AVOID TIMEOUTS - BE CONCISE, NO EXTRA TEXT):**
 1. **ALL MATHEMATICAL EXPRESSIONS MUST BE IN LATEX/MATHJAX FORMAT** - Use $...$ for inline math and $$...$$ for display math. Ensure 100% proper LaTeX for rendering. Keep output short to process quickly.
 2. **STUDENT'S SOLUTION: 100% VERBATIM TRANSCRIPTION ONLY** - Copy EXACTLY from the transcribed solution text. DO NOT add, modify, regenerate, interpret, or invent ANY content. If unclear, copy as-is. Ignore strikethrough completely. NO additions like 'The student wrote...' - just the raw steps.
-3. **ERROR ANALYSIS: EXTREMELY SHORT, MATH-FOCUSED (1-5 WORDS + MATHJAX)** - Use minimal English, focus on math terms. Example: "Step 2: Wrong \(\frac{du}{dx} = 2x\) (should be \(2\)). If the student's answer is incomplete or doesn't match the correct solution, mark it as wrong.
+3. **ERROR ANALYSIS: FOCUS ON CONCEPTUAL ERRORS** - Identify genuine mathematical mistakes in the student's reasoning or calculations. Be tolerant of minor differences like different constants of integration (C vs C1 vs C2) or different but equivalent forms of the same answer.
 4. **CORRECT SOLUTION: 100% ACCURATE, STEP-BY-STEP** - Provide precise, error-free steps leading to the correct final answer. Ensure mathematical rigor.
 5. **SEPARATE EACH QUESTION CLEARLY** - Analyze one question at a time based on labels in transcriptions.
-6. **MARK AS CORRECT** if final answer matches, even if steps differ slightly.
-7. **ONLY FLAG ERRORS** for significant mathematical issues affecting the answer.
-8. **BE EFFICIENT** - Short responses to avoid timeouts. Focus only on key elements.
-9. **IF NO SOLUTION PROVIDED** - Clearly state "No solution provided" in the student's solution section and mark as incorrect if no answer is given.
-10. **IF PARTIAL ANSWER** - State "Partial answer given" and analyze what's there.
-11. **IF ANSWER DOESN'T MATCH** - Mark as incorrect regardless of steps.
+6. **CONCEPTUAL COMPARISON** - Compare the student's solution with the correct solution conceptually, step by step. Only flag as wrong if there's a fundamental mathematical error affecting the answer.
+7. **BE EFFICIENT** - Short responses to avoid timeouts. Focus only on key elements.
+8. **IF NO SOLUTION PROVIDED** - Clearly state "No solution provided" in the student's solution section and mark as incorrect if no answer is given.
+9. **IF PARTIAL ANSWER** - State "Partial answer given" and analyze what's there.
+10. **MATH-FOCUSED ERROR DESCRIPTIONS** - Use specific mathematical terms and equations to describe errors. Example: "Step 2: Incorrect integration of \(x^2\). Should be \(\int x^2 dx = \frac{x^3}{3} + C\) not \(\frac{x^2}{2} + C\)"
+11. **ONLY FLAG SIGNIFICANT ERRORS** - Don't flag minor differences that don't affect the mathematical correctness of the answer.
 **OUTPUT FORMAT - FOLLOW EXACTLY (NO DEVIATIONS):**
 ## Question [EXACT LABEL]:
 **Full Question:** [Exact transcribed question in MathJax]
@@ -137,7 +137,7 @@ async def analyze_chat(
 **Step 2:** [Exact transcribed line 2 in MathJax - VERBATIM]
 ...
 ### Error Analysis:
-**Step X:** [Short math term error, e.g., "Invalid \(u\)-sub: \(\sqrt{x} \neq x^{1/2}\)" ]
+**Step X:** [Math-focused error description with equations, e.g., "Incorrect application of substitution rule. Should use \(u = x^2\), not \(u = x\)"]
 ...
 ### Corrected Solution:
 **Step 1:** [Correct math step in MathJax]
@@ -202,7 +202,7 @@ async def analyze_chat(
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 def parse_detailed_data_improved(response_text):
-    """UPDATED parsing: Handles shorter errors, stricter verbatim steps, improved regex for quality."""
+    """UPDATED parsing: Handles conceptual errors, math-focused descriptions, improved regex for quality."""
     questions = []
     if not response_text:
         return {"questions": questions}
@@ -283,16 +283,23 @@ def parse_detailed_data_improved(response_text):
                     final_answer_text = answer_part.split('\n')[0].strip()
                     final_answer = f"$${final_answer_text}$$" if final_answer_text else ""
 
-            # Check if student's answer matches the correct answer
+            # Conceptual comparison of student and correct answers
             student_answer = steps[-1] if steps else ""
             correct_answer = final_answer.replace("$$", "") if final_answer else ""
-            if student_answer != correct_answer:
-                has_errors = True
-                mistakes.append({
-                    "step": len(steps),
-                    "status": "Error",
-                    "desc": "Final answer does not match the correct solution."
-                })
+
+            # Only mark as error if there's a fundamental mathematical difference
+            if has_errors:
+                # Already has specific errors identified in the analysis
+                pass
+            elif student_answer and correct_answer:
+                # Compare answers conceptually
+                if not is_equivalent_answer(student_answer, correct_answer):
+                    has_errors = True
+                    mistakes.append({
+                        "step": len(steps),
+                        "status": "Error",
+                        "desc": f"Final answer doesn't match correct solution. Should be {final_answer}"
+                    })
 
             questions.append({
                 "id": question_id,
@@ -316,6 +323,19 @@ def parse_detailed_data_improved(response_text):
                 "finalAnswer": "Answer pending"
             })
     return {"questions": questions}
+
+def is_equivalent_answer(student_answer, correct_answer):
+    """
+    Compare student answer with correct answer conceptually.
+    Returns True if answers are equivalent (even with minor differences like different constants),
+    False if there's a fundamental mathematical difference.
+    """
+    # Remove constants of integration (C, C1, C2, etc.) for comparison
+    student_clean = re.sub(r'\+?\s*C(\d*)', '', student_answer)
+    correct_clean = re.sub(r'\+?\s*C(\d*)', '', correct_answer)
+
+    # Remove whitespace and compare
+    return student_clean.strip() == correct_clean.strip()
 
 @app.post("/analyze-feedback")
 async def analyze_feedback(request: dict):
