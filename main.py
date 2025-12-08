@@ -21,7 +21,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable is not set")
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash-lite")
+model = genai.GenerativeModel("gemini-2.5-flash")
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ async def transcribe_image(file: UploadFile) -> str:
             "mime_type": file.content_type or "image/png",
             "data": base64_str
         }
-        prompt = "Transcribe this image EXACTLY as written, converting all mathematical expressions to LaTeX format. Preserve the EXACT structure, text, and steps verbatim without ANY additions, interpretations, or corrections. For handwritten content, transcribe word-for-word and symbol-for-symbol precisely. Ignore strikethrough text completely. Do not add any extra text, explanations, or assumptions. Output only the raw transcription."
+        prompt = "Transcribe this image EXACTLY as written, without any additions, interpretations, or corrections. Convert all mathematical expressions to LaTeX format. Preserve the exact structure, text, and steps verbatim. For handwritten content, transcribe word-for-word and symbol-for-symbol WITHOUT ANY INTERPRETATION OR CORRECTION. Ignore strikethrough text completely. Do not add any extra text, explanations, or assumptions. Output only the raw transcription."
         response = await model.generate_content_async([prompt, image_part])
         return response.text.strip()
     except Exception as e:
@@ -107,29 +107,26 @@ async def analyze_chat(
         system_prompt = r"""You are a **PhD-Level Math Teacher** analyzing student work based on transcribed texts.
 **CRITICAL INSTRUCTIONS FOR OUTPUT (FOLLOW STRICTLY TO AVOID TIMEOUTS - BE CONCISE, NO EXTRA TEXT):**
 1. **ALL MATHEMATICAL EXPRESSIONS MUST BE IN LATEX/MATHJAX FORMAT** - Use $...$ for inline math and $$...$$ for display math. Ensure 100% proper LaTeX for rendering. Keep output short to process quickly.
-2. **STUDENT'S SOLUTION: 100% VERBATIM TRANSCRIPTION ONLY** - Copy EXACTLY from the transcribed solution text. DO NOT add, modify, regenerate, interpret, or invent ANY content. If unclear, copy as-is. Ignore strikethrough completely. NO additions like 'The student wrote...' - just the raw steps. If the transcription is incomplete or partial, output it exactly as is without any additions.
-3. **ERROR ANALYSIS: EXTREMELY SHORT, MATH-FOCUSED (1-5 WORDS + MATHJAX)** - Use minimal English, focus on math terms. Example: "Step 2: Wrong \(\frac{du}{dx} = 2x\) (should be \(2\))". NO long sentences, explanations, or corrections here. Max 10 words per error. If student's final answer does not match the correct final answer, explicitly flag it as "Final answer mismatch: [student's] vs [correct]". If incomplete, flag "Solution incomplete - missing steps/final answer".
-4. **CORRECT SOLUTION: 100% ACCURATE, STEP-BY-STEP** - Provide precise, error-free steps leading to the correct final answer. Ensure mathematical rigor.
-5. **SEPARATE EACH QUESTION CLEARLY** - Analyze one question at a time based on labels in transcriptions. Use exact question labels from transcriptions (e.g., "1(a)", "Q2").
+2. **STUDENT'S SOLUTION: 100% VERBATIM TRANSCRIPTION ONLY** - Copy EXACTLY from the transcribed solution text. DO NOT add, modify, regenerate, interpret, or invent ANY content. If unclear, copy as-is. Ignore strikethrough completely. NO additions like 'The student wrote...' - just the raw steps. Output as a single block of text with steps preserved exactly as transcribed.
+3. **ERROR ANALYSIS: EXTREMELY SHORT, MATH-FOCUSED (1-5 WORDS + MATHJAX)** - Use minimal English, focus on math terms. Example: "Step 2: Wrong \(\frac{du}{dx} = 2x\) (should be \(2\))". NO long sentences, explanations, or corrections here. Max 10 words per error. If solution is incomplete or final answer doesn't match correct answer, flag as "Incomplete solution" or "Final answer mismatch" and mark as incorrect.
+4. **CORRECT SOLUTION: 100% ACCURATE, STEP-BY-STEP** - Provide precise, error-free steps leading to the correct final answer. Ensure mathematical rigor. Output as a single block of steps.
+5. **SEPARATE EACH QUESTION CLEARLY** - Analyze one question at a time based on labels in transcriptions. Use exact question labels from the transcription (e.g., "1(a)", "Question 2").
 6. **MARK AS CORRECT** if final answer matches, even if steps differ slightly.
-7. **ONLY FLAG ERRORS** for significant mathematical issues affecting the answer. Always check if final answer matches; if not, flag as incorrect.
+7. **ONLY FLAG ERRORS** for significant mathematical issues affecting the answer. Always check if final answer matches; if not, flag as error regardless of steps.
 8. **BE EFFICIENT** - Short responses to avoid timeouts. Focus only on key elements.
-9. **IF NO SOLUTION PROVIDED** - Clearly state "No solution provided" in the student's solution section and mark as incorrect if no answer is given. Flag in error analysis: "No solution - incorrect".
-10. **IF PARTIAL ANSWER** - State "Partial answer given" and analyze what's there. If final answer missing or doesn't match, mark as incorrect and flag "Incomplete solution - final mismatch".
-11. **IF ANSWER DOESN'T MATCH** - Mark as incorrect regardless of steps. Explicitly compare final answers in error analysis.
+9. **IF NO SOLUTION PROVIDED** - Clearly state "No solution provided" in the student's solution section and mark as incorrect if no answer is given.
+10. **IF PARTIAL ANSWER** - State "Partial answer given" and analyze what's there. If incomplete and final answer doesn't match, mark as incorrect with "Incomplete solution - final mismatch".
+11. **IF ANSWER DOESN'T MATCH** - Mark as incorrect regardless of steps. Flag in error analysis as "Final answer incorrect".
 **OUTPUT FORMAT - FOLLOW EXACTLY (NO DEVIATIONS):**
-## Question [EXACT LABEL]:
+## Question [EXACT LABEL FROM TRANSCRIPTION]:
 **Full Question:** [Exact transcribed question in MathJax]
 ### Student's Solution – Exact Copy:
-**Step 1:** [Exact transcribed line 1 in MathJax - VERBATIM]
-**Step 2:** [Exact transcribed line 2 in MathJax - VERBATIM]
-...
+[Exact transcribed steps in MathJax as a single block - VERBATIM, no separate steps]
 ### Error Analysis:
-**Step X:** [Short math term error, e.g., "Invalid \(u\)-sub: \(\sqrt{x} \neq x^{1/2}\)" ]
+**Error:** [Short math term error, e.g., "Invalid \(u\)-sub: \(\sqrt{x} \neq x^{1/2}\)" ]
 ...
 ### Corrected Solution:
-**Step 1:** [Correct math step in MathJax]
-...
+[Correct math steps in MathJax as a single block]
 **Final Answer:** $$\boxed{final_answer}$$
 ---
 **PERFORMANCE TABLE (UPDATE BASED ON ACTUAL ERRORS FOUND - KEEP SHORT)**
@@ -220,10 +217,8 @@ def parse_detailed_data_improved(response_text):
                     solution_section = solution_part.split('###')[0]
                 else:
                     solution_section = solution_part
-                step_pattern = r'\*\*Step\s+(\d+):\*\*\s*(.*?)(?=\*\*Step\s+\d+:|###|\Z)'
-                step_matches = re.findall(step_pattern, solution_section, re.DOTALL | re.IGNORECASE)
-                steps = [match[1].strip() for match in step_matches if match[1].strip()]
-            if not steps:
+                steps = [solution_section.strip()]
+            if not steps or not steps[0]:
                 steps = ["No solution provided"]
        
             mistakes = []
@@ -234,16 +229,15 @@ def parse_detailed_data_improved(response_text):
                     error_section = error_part.split('###')[0]
                 else:
                     error_section = error_part
-                error_pattern = r'\*\*Step\s*(\d+):\*\*\s*(.*?)(?=\*\*Step\s*\d+:|\Z)'
+                error_pattern = r'\*\*Error:\*\*\s*(.*?)(?=\*\*Error:|\Z)'
                 error_matches = re.findall(error_pattern, error_section, re.DOTALL | re.IGNORECASE)
                 for match in error_matches:
-                    step_num, error_desc = match
-                    if error_desc.strip():
+                    error_desc = match.strip()
+                    if error_desc:
                         has_errors = True
                         mistakes.append({
-                            "step": step_num,
                             "status": "Error",
-                            "desc": error_desc.strip()
+                            "desc": error_desc
                         })
        
             corrected_steps = []
@@ -253,9 +247,7 @@ def parse_detailed_data_improved(response_text):
                     correct_section = correct_part.split('##')[0]
                 else:
                     correct_section = correct_part
-                step_pattern = r'\*\*Step\s+(\d+):\*\*\s*(.*?)(?=\*\*Step\s+\d+:|\*\*Final Answer|\Z)'
-                step_matches = re.findall(step_pattern, correct_section, re.DOTALL)
-                corrected_steps = [match[1].strip() for match in step_matches if match[1].strip()]
+                corrected_steps = [correct_section.split('**Final Answer:**')[0].strip()]
        
             final_answer = ""
             final_match = re.search(r'\\boxed{(.*?)}', section)
@@ -427,4 +419,3 @@ def format_questions_for_practice_prompt(questions_with_errors):
     return formatted
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
-
