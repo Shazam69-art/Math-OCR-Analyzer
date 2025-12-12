@@ -21,7 +21,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY environment variable is not set")
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
-MODEL = "gpt-4o"  # Use gpt-4o as it's the latest; adjust if needed
+MODEL = "gpt-5.1"  
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -449,3 +449,4 @@ def format_questions_for_practice_prompt(questions_with_errors):
     return formatted
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+
