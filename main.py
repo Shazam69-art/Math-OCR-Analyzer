@@ -21,7 +21,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY environment variable is not set")
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
-MODEL = "gpt-5.1"  
+MODEL = "gpt-5.1"  # Updated to match your testing code; change to "gpt-4o" if preferred
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -68,11 +68,12 @@ async def transcribe_image(file: UploadFile) -> str:
                 {"type": "image_url", "image_url": {"url": f"data:{file.content_type or 'image/png'};base64,{base64_str}"}}
             ]}
         ]
+        # FIXED: Use max_completion_tokens for GPT-5.1
         response = await asyncio.to_thread(client.chat.completions.create,
             model=MODEL,
             messages=messages,
             temperature=0.0,
-            max_tokens=1024
+            max_completion_tokens=1024  # Changed from max_tokens
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
@@ -175,11 +176,12 @@ async def analyze_chat(
      
         # Call OpenAI asynchronously
         try:
+            logger.info(f"Calling OpenAI with model={MODEL}, max_completion_tokens=3000")
             response = await asyncio.to_thread(client.chat.completions.create,
                 model=MODEL,
                 messages=messages,
                 temperature=0.3,
-                max_tokens=3000  # Limit to keep token usage similar
+                max_completion_tokens=3000  # FIXED: Changed from max_tokens
             )
             ai_response = response.choices[0].message.content
         except Exception as openai_error:
@@ -334,7 +336,12 @@ async def analyze_feedback(request: dict):
             {"role": "system", "content": "You are a helpful math analyzer."},
             {"role": "user", "content": feedback_prompt}
         ]
-        response = client.chat.completions.create(model=MODEL, messages=messages)
+        # FIXED: Use max_completion_tokens
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            max_completion_tokens=1000  # Changed from max_tokens
+        )
         updated_analysis = response.choices[0].message.content
     
         updated_question = parse_single_question(updated_analysis, question.get('id', f"Q{len(question)}"))
@@ -424,7 +431,13 @@ Evaluate $\int x^7 dx$
             {"role": "system", "content": "You are a math practice paper generator."},
             {"role": "user", "content": practice_prompt}
         ]
-        response = client.chat.completions.create(model=MODEL, messages=messages, temperature=0.3, max_tokens=2000)
+        # FIXED: Use max_completion_tokens
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            temperature=0.3,
+            max_completion_tokens=2000  # Changed from max_tokens
+        )
         practice_paper = response.choices[0].message.content
     
         logger.info(f"Successfully generated practice paper with {len(questions_with_errors)} questions")
@@ -449,4 +462,3 @@ def format_questions_for_practice_prompt(questions_with_errors):
     return formatted
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
-
