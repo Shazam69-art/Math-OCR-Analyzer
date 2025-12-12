@@ -2,6 +2,7 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 Pillow>=10.0.0
-openai>=1.30.0         
-html2pdf.js==0.10.1    
+openai>=1.30.0
 requests==2.31.0
+python-dotenv==1.0.1
+gunicorn==21.2.0
