@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from PIL import Image
-import google.generativeai as genai
+import openai
 from typing import List
 import logging
 from datetime import datetime
@@ -17,12 +17,11 @@ import re
 from fastapi import Request
 import asyncio
 
-# Configure Gemini from environment variable
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY environment variable is not set")
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash")
+# Configure OpenAI from environment variable
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY environment variable is not set")
+openai.api_key = OPENAI_API_KEY
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -51,11 +50,11 @@ def pil_to_base64_png(im: Image.Image) -> str:
 async def process_uploaded_file(file: UploadFile) -> List[str]:
     """Process uploaded file and return base64 encoded pages."""
     content = await file.read()
- 
+
     if file.content_type == "application/pdf":
         logger.warning("PDF processing requires pypdfium2. Install it for full functionality.")
         raise HTTPException(status_code=400, detail="PDF processing is not available. Please install pypdfium2 or convert PDFs to images.")
- 
+
     elif file.content_type.startswith("image/"):
         try:
             image = Image.open(io.BytesIO(content))
@@ -67,17 +66,33 @@ async def process_uploaded_file(file: UploadFile) -> List[str]:
         raise HTTPException(status_code=400, detail="Unsupported file type")
 
 async def transcribe_image(file: UploadFile) -> str:
-    """Transcribe a single image using Gemini asynchronously."""
+    """Transcribe a single image using OpenAI asynchronously."""
     try:
         content = await file.read()
         base64_str = base64.b64encode(content).decode('utf-8')
-        image_part = {
-            "mime_type": file.content_type or "image/png",
-            "data": base64_str
-        }
-        prompt = "Transcribe this image exactly as written, converting all mathematical expressions to LaTeX format. Preserve the exact structure, text, and steps verbatim. For handwritten content, transcribe word-for-word and symbol-for-symbol without any interpretation or correction. Ignore strikethrough text completely."
-        response = await model.generate_content_async([prompt, image_part])
-        return response.text.strip()
+
+        response = openai.ChatCompletion.create(
+            model="gpt-5.1",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Transcribe this image exactly as written, converting all mathematical expressions to LaTeX format. Preserve the exact structure, text, and steps verbatim. For handwritten content, transcribe word-for-word and symbol-for-symbol without any interpretation or correction. Ignore strikethrough text completely."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/{file.content_type.split('/')[1]};base64,{base64_str}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=2000  # Let OpenAI handle the rest automatically
+        )
+        return response.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"Transcription error for file {file.filename}: {str(e)}")
         return f"Transcription failed for {file.filename}: {str(e)}"
@@ -101,22 +116,22 @@ async def analyze_chat(
         question_count: int = Form(0),
         files: List[UploadFile] = File([])
 ):
-    """Main analysis endpoint using Gemini with IMPROVED OUTPUT FORMAT."""
+    """Main analysis endpoint using OpenAI with IMPROVED OUTPUT FORMAT."""
     try:
         logger.info(f"Analysis request - Message: {message[:100]}, Files: {len(files)}, Question count: {question_count}")
-      
+
         # Split files into questions and solutions based on question_count
         question_files = files[:question_count]
         solution_files = files[question_count:]
-      
+
         # Transcribe images asynchronously to get text
         question_texts = await transcribe_images(question_files)
         solution_texts = await transcribe_images(solution_files)
-      
+
         # Format transcribed texts
         question_paper = "\n\n".join([f"Question Page {i+1}:\n{text}" for i, text in enumerate(question_texts)])
         solution_paper = "\n\n".join([f"Solution Page {i+1}:\n{text}" for i, text in enumerate(solution_texts)])
-      
+
         # UPDATED & FINAL SYSTEM PROMPT (WITH RULES 9–11 FOR STRICTER ACCURACY)
         system_prompt = r"""You are a **PhD-Level Math Teacher** analyzing student work based on transcribed texts.
 **CRITICAL INSTRUCTIONS FOR OUTPUT (FOLLOW STRICTLY TO AVOID TIMEOUTS - BE CONCISE, NO EXTRA TEXT):**
@@ -171,27 +186,31 @@ async def analyze_chat(
 ## Performance Insights
 [Short insights with MathJax where needed - max 3-5 sentences]"""
 
-        # Prepare content for Gemini
+        # Prepare content for OpenAI
         contents = [
-            system_prompt,
-            f"Question Paper Transcription:\n{question_paper}",
-            f"Student Solution Transcription:\n{solution_paper}"
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Question Paper Transcription:\n{question_paper}"},
+            {"role": "user", "content": f"Student Solution Transcription:\n{solution_paper}"}
         ]
         if message:
-            contents.append(f"User request: {message}")
-      
-        # Call Gemini asynchronously
+            contents.append({"role": "user", "content": f"User request: {message}"})
+
+        # Call OpenAI
         try:
-            response = await model.generate_content_async(contents)
-            ai_response = response.text
-        except Exception as genai_error:
-            logger.error(f"Gemini API error: {str(genai_error)}")
+            response = openai.ChatCompletion.create(
+                model="gpt-5.1",
+                messages=contents,
+                max_tokens=4000  # Let OpenAI handle the rest automatically
+            )
+            ai_response = response.choices[0].message.content
+        except Exception as openai_error:
+            logger.error(f"OpenAI API error: {str(openai_error)}")
             raise HTTPException(status_code=504, detail="Analysis service is taking longer than expected. Please try again.")
-      
+
         # Parse detailed data for frontend
         detailed_data = parse_detailed_data_improved(ai_response)
         logger.info(f"Analysis completed. Found {len(detailed_data.get('questions', []))} questions")
-      
+
         return JSONResponse({
             "status": "success",
             "response": ai_response,
@@ -209,10 +228,10 @@ def parse_detailed_data_improved(response_text):
     questions = []
     if not response_text:
         return {"questions": questions}
- 
+
     question_sections = re.split(r'## Question\s+', response_text)
     question_sections = [section for section in question_sections if section.strip() and not section.startswith('Questions found')]
- 
+
     for i, section in enumerate(question_sections, 1):
         try:
             question_id_match = re.search(r'^([A-Z]?[0-9]+[a-z]?(?:\([a-z]\))?[^:\n]*):?', section)
@@ -221,7 +240,7 @@ def parse_detailed_data_improved(response_text):
             else:
                 alt_match = re.search(r'^(Q?[0-9]+[a-z]?(?:\s*\([a-z]\))?)', section)
                 question_id = alt_match.group(1).strip() if alt_match else f"Q{i}"
-         
+
             question_text = "Question content not extracted"
             if '**Full Question:**' in section:
                 question_part = section.split('**Full Question:**')[1]
@@ -230,7 +249,7 @@ def parse_detailed_data_improved(response_text):
                 else:
                     question_text = question_part.strip()
             question_text = re.sub(r'### Student\'s Solution.*?###', '', question_text, flags=re.DOTALL).strip()
-         
+
             steps = []
             if '### Student\'s Solution' in section:
                 solution_part = section.split('### Student\'s Solution')[1]
@@ -243,7 +262,7 @@ def parse_detailed_data_improved(response_text):
                 steps = [match[1].strip() for match in step_matches if match[1].strip()]
             if not steps:
                 steps = ["No solution provided"]
-         
+
             mistakes = []
             has_errors = False
             if '### Error Analysis' in section:
@@ -263,7 +282,7 @@ def parse_detailed_data_improved(response_text):
                             "status": "Error",
                             "desc": error_desc.strip()
                         })
-         
+
             corrected_steps = []
             if '### Corrected Solution' in section:
                 correct_part = section.split('### Corrected Solution')[1]
@@ -274,7 +293,7 @@ def parse_detailed_data_improved(response_text):
                 step_pattern = r'\*\*Step\s+(\d+):\*\*\s*(.*?)(?=\*\*Step\s+\d+:|\*\*Final Answer|\Z)'
                 step_matches = re.findall(step_pattern, correct_section, re.DOTALL)
                 corrected_steps = [match[1].strip() for match in step_matches if match[1].strip()]
-         
+
             final_answer = ""
             final_match = re.search(r'\\boxed{(.*?)}', section)
             if final_match:
@@ -287,7 +306,7 @@ def parse_detailed_data_improved(response_text):
                 else:
                     final_answer_text = answer_part.split('\n')[0].strip()
                     final_answer = f"$${final_answer_text}$$" if final_answer_text else ""
-         
+
             questions.append({
                 "id": question_id,
                 "questionText": question_text[:500] + "..." if len(question_text) > 500 else question_text,
@@ -297,7 +316,7 @@ def parse_detailed_data_improved(response_text):
                 "correctedSteps": corrected_steps or ["Complete solution will be shown after analysis"],
                 "finalAnswer": final_answer or "Answer will be determined after analysis"
             })
-     
+
         except Exception as e:
             logger.error(f"Error parsing question {i}: {e}")
             questions.append({
@@ -309,7 +328,7 @@ def parse_detailed_data_improved(response_text):
                 "correctedSteps": ["Solution analysis"],
                 "finalAnswer": "Answer pending"
             })
- 
+
     return {"questions": questions}
 
 @app.post("/analyze-feedback")
@@ -318,13 +337,13 @@ async def analyze_feedback(request: dict):
         question = request.get("question", {})
         feedback = request.get("feedback", "")
         original_analysis = request.get("original_analysis", "")
-     
+
         if not question or not feedback:
             return JSONResponse({
                 "success": False,
                 "error": "Missing question or feedback data"
             })
-     
+
         feedback_prompt = f"""
         A user has provided feedback on the analysis of Question {question.get('id', 'Unknown')}:
         Original Question: {question.get('questionText', '')}
@@ -336,18 +355,25 @@ async def analyze_feedback(request: dict):
         3. Ensuring all mathematical expressions are in proper MathJax/LaTeX format
         Provide the updated analysis for this question only.
         """
-     
-        response = model.generate_content(feedback_prompt)
-        updated_analysis = response.text
-     
+
+        response = openai.ChatCompletion.create(
+            model="gpt-5.1",
+            messages=[
+                {"role": "system", "content": "You are a PhD-Level Math Teacher."},
+                {"role": "user", "content": feedback_prompt}
+            ],
+            max_tokens=2000  # Let OpenAI handle the rest automatically
+        )
+        updated_analysis = response.choices[0].message.content
+
         updated_question = parse_single_question(updated_analysis, question.get('id', f"Q{len(question)}"))
-     
+
         return JSONResponse({
             "success": True,
             "updated_question": updated_question,
             "message": "Analysis updated successfully"
         })
- 
+
     except Exception as e:
         logger.error(f"Feedback analysis failed: {str(e)}")
         return JSONResponse({
@@ -388,19 +414,19 @@ async def create_practice_paper(request: dict):
     try:
         detailed_data = request.get("detailed_data", {})
         questions_with_errors = []
-     
+
         for q in detailed_data.get("questions", []):
             if q.get('hasErrors', False) and q.get('mistakes'):
                 questions_with_errors.append(q)
-     
+
         logger.info(f"Found {len(questions_with_errors)} questions with errors for practice paper")
-     
+
         if not questions_with_errors:
             return JSONResponse({
                 "success": False,
                 "error": "No questions with errors found. Your solutions appear to be correct!"
             })
-     
+
         practice_prompt = f"""Create a targeted practice paper with EXACTLY {len(questions_with_errors)} redesigned questions.
 **CRITICAL REQUIREMENTS:**
 1. For EACH original question, create ONE modified practice question - redesign ALL provided.
@@ -429,19 +455,26 @@ Evaluate $\int x^7 dx$
 - NO extra text - just "Based on Question"
 - Each question must be separated by ---
 - Focus on same mathematical concepts with different coefficients/values - redesign EVERY one provided"""
-     
-        response = model.generate_content(practice_prompt)
-        practice_paper = response.text
-     
+
+        response = openai.ChatCompletion.create(
+            model="gpt-5.1",
+            messages=[
+                {"role": "system", "content": "You are a PhD-Level Math Teacher."},
+                {"role": "user", "content": practice_prompt}
+            ],
+            max_tokens=4000  # Let OpenAI handle the rest automatically
+        )
+        practice_paper = response.choices[0].message.content
+
         logger.info(f"Successfully generated practice paper with {len(questions_with_errors)} questions")
-     
+
         return JSONResponse({
             "success": True,
             "practice_paper": practice_paper,
             "questions_used": len(questions_with_errors),
             "message": f"Practice paper created targeting {len(questions_with_errors)} error areas"
         })
- 
+
     except Exception as e:
         logger.error(f"Practice paper creation failed: {str(e)}")
         return JSONResponse({
@@ -458,7 +491,3 @@ def format_questions_for_practice_prompt(questions_with_errors):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
-
-
-
-
