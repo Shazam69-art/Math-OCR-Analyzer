@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from PIL import Image
-import openai
+from openai import OpenAI
 from typing import List
 import logging
 from datetime import datetime
@@ -21,7 +21,9 @@ import asyncio
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY environment variable is not set")
-openai.api_key = OPENAI_API_KEY
+
+# Initialize OpenAI client
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -71,7 +73,7 @@ async def transcribe_image(file: UploadFile) -> str:
         content = await file.read()
         base64_str = base64.b64encode(content).decode('utf-8')
 
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-5.1",
             messages=[
                 {
@@ -90,7 +92,7 @@ async def transcribe_image(file: UploadFile) -> str:
                     ]
                 }
             ],
-            max_tokens=2000  # Let OpenAI handle the rest automatically
+            max_tokens=2000
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
@@ -197,10 +199,10 @@ async def analyze_chat(
 
         # Call OpenAI
         try:
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-5.1",
                 messages=contents,
-                max_tokens=4000  # Let OpenAI handle the rest automatically
+                max_tokens=4000
             )
             ai_response = response.choices[0].message.content
         except Exception as openai_error:
@@ -356,13 +358,13 @@ async def analyze_feedback(request: dict):
         Provide the updated analysis for this question only.
         """
 
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-5.1",
             messages=[
                 {"role": "system", "content": "You are a PhD-Level Math Teacher."},
                 {"role": "user", "content": feedback_prompt}
             ],
-            max_tokens=2000  # Let OpenAI handle the rest automatically
+            max_tokens=2000
         )
         updated_analysis = response.choices[0].message.content
 
@@ -456,13 +458,13 @@ Evaluate $\int x^7 dx$
 - Each question must be separated by ---
 - Focus on same mathematical concepts with different coefficients/values - redesign EVERY one provided"""
 
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-5.1",
             messages=[
                 {"role": "system", "content": "You are a PhD-Level Math Teacher."},
                 {"role": "user", "content": practice_prompt}
             ],
-            max_tokens=4000  # Let OpenAI handle the rest automatically
+            max_tokens=4000
         )
         practice_paper = response.choices[0].message.content
 
