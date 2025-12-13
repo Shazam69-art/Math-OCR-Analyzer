@@ -92,7 +92,7 @@ async def transcribe_image(file: UploadFile) -> str:
                     ]
                 }
             ],
-            max_tokens=2000
+            max_completion_tokens=2000  # Use max_completion_tokens for vision requests
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
@@ -201,8 +201,7 @@ async def analyze_chat(
         try:
             response = client.chat.completions.create(
                 model="gpt-5.1",
-                messages=contents,
-                max_tokens=4000
+                messages=contents
             )
             ai_response = response.choices[0].message.content
         except Exception as openai_error:
@@ -363,8 +362,7 @@ async def analyze_feedback(request: dict):
             messages=[
                 {"role": "system", "content": "You are a PhD-Level Math Teacher."},
                 {"role": "user", "content": feedback_prompt}
-            ],
-            max_tokens=2000
+            ]
         )
         updated_analysis = response.choices[0].message.content
 
@@ -463,8 +461,7 @@ Evaluate $\int x^7 dx$
             messages=[
                 {"role": "system", "content": "You are a PhD-Level Math Teacher."},
                 {"role": "user", "content": practice_prompt}
-            ],
-            max_tokens=4000
+            ]
         )
         practice_paper = response.choices[0].message.content
 
