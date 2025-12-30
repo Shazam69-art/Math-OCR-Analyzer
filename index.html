@@ -1621,95 +1621,105 @@
         }
 
         function displayAnalysis(result) {
-            const accordion = document.getElementById('accordion');
-            accordion.innerHTML = '';
-            let counts = {correct: 0, partial: 0, incorrect: 0};
-            result.questions.forEach((q, i) => {
-                counts[q.status]++;
-                const item = document.createElement('div');
-                item.className = 'accordion-item';
-                item.innerHTML = `
-                    <button class="accordion-trigger" onclick="toggleAccordion('q${i}')">
-                        <div class="question-number ${q.status}">${q.number}</div>
-                        <div class="question-info">
-                            <p>${q.question}</p>
-                            <p>Status: ${q.status}</p>
-                        </div>
-                    </button>
-                    <div id="q${i}" class="accordion-content">
-                        <div class="analysis-section">
-                            <h3><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg> Student Solution</h3>
-                            <div class="solution-card"><div class="solution-steps">${processSteps(q.student_original)}</div></div>
-                        </div>
-                        <div class="analysis-section">
-                            <h3><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Error Analysis</h3>
-                            <div class="solution-card error"><p>${q.error}</p></div>
-                        </div>
-                        <div class="analysis-section">
-                            <h3><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> LLM-Corrected Solution</h3>
-                            <div class="solution-card corrected"><div class="solution-steps">${processSteps(q.correct_solution)}</div></div>
-                        </div>
-                        <button class="btn-outline" onclick="openImageModal(${i}, '${q.status}', '${q.image_file || ''}', ${JSON.stringify(q.error_bbox || {})})">
-                            <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                            View Answer Image
-                        </button>
-                        <div class="reanalysis-card">
-                            <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;">Re-analyze This Question</h3>
-                            <div class="reanalysis-input-group">
-                                <input type="text" id="reanalysisInput${i}" placeholder="Ask AI to re-analyze this question...">
-                                <button class="btn-primary" style="width: auto;" onclick="reanalyzeQuestion(${i})">Send</button>
-                            </div>
-                            <div id="aiResponse${i}" style="display: none;" class="ai-response">
-                                <div class="ai-badge">AI</div>
-                                <p></p>
-                            </div>
-                        </div>
-                    </div>`;
-                accordion.appendChild(item);
-            });
-            document.getElementById('badgeGroup').innerHTML = `
-                <div class="badge"><div class="badge-dot correct"></div>${counts.correct} Correct</div>
-                <div class="badge"><div class="badge-dot partial"></div>${counts.partial} Partial</div>
-                <div class="badge"><div class="badge-dot incorrect"></div>${counts.incorrect} Incorrect</div>
-            `;
+    const accordion = document.getElementById('accordion');
+    accordion.innerHTML = '';
+    let counts = {correct: 0, partial: 0, incorrect: 0};
+    result.questions.forEach((q, i) => {
+        counts[q.status]++;
+        const item = document.createElement('div');
+        item.className = 'accordion-item';
+        item.innerHTML = `
+            <button class="accordion-trigger" onclick="toggleAccordion('q${i}')">
+                <div class="question-number ${q.status}">${q.number}</div>
+                <div class="question-info">
+                    <p>${q.question}</p>
+                    <p>Status: ${q.status}</p>
+                </div>
+            </button>
+            <div id="q${i}" class="accordion-content">
+                <div class="analysis-section">
+                    <h3><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg> Student Solution</h3>
+                    <div class="solution-card"><div class="solution-steps">${processSteps(q.student_original)}</div></div>
+                </div>
+                <div class="analysis-section">
+                    <h3><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Error Analysis</h3>
+                    <div class="solution-card error"><p>${q.error}</p></div>
+                </div>
+                <div class="analysis-section">
+                    <h3><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> LLM-Corrected Solution</h3>
+                    <div class="solution-card corrected"><div class="solution-steps">${processSteps(q.correct_solution)}</div></div>
+                </div>
+                <button class="btn-outline" onclick="openImageModal(${i}, '${q.status}', '${q.image_file || ''}', ${JSON.stringify(q.error_bbox || {})})">
+                    <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    View Answer Image
+                </button>
+                <div class="reanalysis-card">
+                    <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;">Re-analyze This Question</h3>
+                    <div class="reanalysis-input-group">
+                        <input type="text" id="reanalysisInput${i}" placeholder="Ask AI to re-analyze this question...">
+                        <button class="btn-primary" style="width: auto;" onclick="reanalyzeQuestion(${i})">Send</button>
+                    </div>
+                    <div id="aiResponse${i}" style="display: none;" class="ai-response">
+                        <div class="ai-badge">AI</div>
+                        <p></p>
+                    </div>
+                </div>
+            </div>`;
+        accordion.appendChild(item);
+        
+        // Render MathJax for this question
+        if (window.MathJax) {
+            MathJax.typesetPromise([item]);
         }
-
+    });
+    
+    document.getElementById('badgeGroup').innerHTML = `
+        <div class="badge"><div class="badge-dot correct"></div>${counts.correct} Correct</div>
+        <div class="badge"><div class="badge-dot partial"></div>${counts.partial} Partial</div>
+        <div class="badge"><div class="badge-dot incorrect"></div>${counts.incorrect} Incorrect</div>
+    `;
+}
         function toggleAccordion(id) {
             document.getElementById(id).classList.toggle('open');
         }
 
         async function reanalyzeQuestion(i) {
-            const query = document.getElementById(`reanalysisInput${i}`).value.trim();
-            if (!query) return;
-            const question = analysisResult.questions[i];
-            const btn = event.target;
-            btn.innerHTML = '<div class="loading" style="width: 16px; height: 16px; border-width: 2px;"></div>';
-            try {
-                const res = await fetch('https://navalsheth.pythonanywhere.com/reanalyze', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        user_query: query,
-                        question: question.question,
-                        student_original: question.student_original,
-                        error: question.error,
-                        correct_solution: question.correct_solution
-                    })
-                });
-                const data = await res.json();
-                if (data.error) {
-                    alert(data.error);
-                } else {
-                    const responseDiv = document.getElementById(`aiResponse${i}`);
-                    responseDiv.style.display = 'flex';
-                    responseDiv.querySelector('p').innerHTML = data.response;
-                }
-            } catch (e) {
-                alert('Error: ' + e.message);
-            } finally {
-                btn.innerHTML = 'Send';
+    const query = document.getElementById(`reanalysisInput${i}`).value.trim();
+    if (!query) return;
+    const question = analysisResult.questions[i];
+    const btn = event.target;
+    btn.innerHTML = '<div class="loading" style="width: 16px; height: 16px; border-width: 2px;"></div>';
+    try {
+        const res = await fetch('https://navalsheth.pythonanywhere.com/reanalyze', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                user_query: query,
+                question: question.question,
+                student_original: question.student_original,
+                error: question.error,
+                correct_solution: question.correct_solution
+            })
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+        } else {
+            const responseDiv = document.getElementById(`aiResponse${i}`);
+            responseDiv.style.display = 'flex';
+            responseDiv.querySelector('p').innerHTML = data.response;
+            
+            // Render MathJax in the AI response
+            if (window.MathJax) {
+                MathJax.typesetPromise([responseDiv]);
             }
         }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    } finally {
+        btn.innerHTML = 'Send';
+    }
+}
 
         function openImageModal(i, status, imageFile, bbox) {
             const modal = document.getElementById('imageModal');
@@ -1737,54 +1747,50 @@
         }
 
         async function generatePracticePaper() {
-            if (!analysisResult) return;
-            const content = document.getElementById('practicePaperContent');
-            content.innerHTML = '<div class="loading"></div> Generating...';
-            try {
-                const res = await fetch('https://navalsheth.pythonanywhere.com/generate_practice', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({analysis: analysisResult})
-                });
-                const data = await res.json();
-                if (data.error) {
-                    content.innerHTML = `<p>Error: ${data.error}</p>`;
-                } else if (data.practice_questions.length === 0) {
-                    content.innerHTML = '<p>No mistakes found, no practice needed!</p>';
-                } else {
-                    practiceResult = data;
-                    content.innerHTML = `
-                        <div class="practice-paper" id="practice-paper">
-                            <div class="practice-header">
-                                <div class="practice-title">📝 Practice Paper</div>
-                                <div class="practice-subtitle">Practice questions based on areas needing improvement</div>
+    if (!analysisResult) return;
+    const content = document.getElementById('practicePaperContent');
+    content.innerHTML = '<div class="loading"></div> Generating...';
+    try {
+        const res = await fetch('https://navalsheth.pythonanywhere.com/generate_practice', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({analysis: analysisResult})
+        });
+        const data = await res.json();
+        if (data.error) {
+            content.innerHTML = `<p>Error: ${data.error}</p>`;
+        } else if (data.practice_questions.length === 0) {
+            content.innerHTML = '<p>No mistakes found, no practice needed!</p>';
+        } else {
+            practiceResult = data;
+            content.innerHTML = `
+                <div class="practice-paper" id="practice-paper">
+                    <div class="practice-header">
+                        <div class="practice-title">📝 Practice Paper</div>
+                        <div class="practice-subtitle">Practice questions based on areas needing improvement</div>
+                    </div>
+                    <div class="practice-questions">
+                        ${data.practice_questions.map(pq => `
+                            <div class="practice-question">
+                                <div class="practice-question-number">Question ${pq.number}</div>
+                                <div class="practice-question-text">${pq.question}</div>
                             </div>
-                            <div class="practice-questions">
-                                ${data.practice_questions.map(pq => `
-                                    <div class="practice-question">
-                                        <div class="practice-question-number">Question ${pq.number}</div>
-                                        <div class="practice-question-text no-mathjax">${pq.question}</div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            <div style="text-align:center; margin-top:40px;">
-                                <button class="btn-outline" onclick="downloadPracticePaper()"> 📥 Download as PDF </button>
-                            </div>
-                        </div>`;
-                    
-                    // Wait a moment then render MathJax
-                    setTimeout(() => {
-                        if (window.MathJax) {
-                            MathJax.typesetPromise([document.getElementById('practice-paper')]).then(() => {
-                                console.log('MathJax rendered practice paper');
-                            });
-                        }
-                    }, 100);
-                }
-            } catch (e) {
-                content.innerHTML = `<p>Error: ${e.message}</p>`;
+                        `).join('')}
+                    </div>
+                    <div style="text-align:center; margin-top:40px;">
+                        <button class="btn-outline" onclick="downloadPracticePaper()"> 📥 Download as PDF </button>
+                    </div>
+                </div>`;
+            
+            // Render MathJax on the new content
+            if (window.MathJax) {
+                MathJax.typesetPromise([document.getElementById('practice-paper')]);
             }
         }
+    } catch (e) {
+        content.innerHTML = `<p>Error: ${e.message}</p>`;
+    }
+}
 
         async function downloadPracticePaper() {
             if (!practiceResult) return;
