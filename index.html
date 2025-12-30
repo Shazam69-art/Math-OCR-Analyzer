@@ -1606,7 +1606,7 @@
       allFiles.forEach(f => formData.append("files", f.file));
 
       try {
-        const res = await fetch("https://math-ocr-final.onrender.com/analyze", {
+        const res = await fetch("https://navalsheth.pythonanywhere.com/analyze", {
           method: "POST",
           body: formData
         });
@@ -1740,7 +1740,7 @@
       btn.disabled = true;
 
       try {
-        const res = await fetch("https://math-ocr-final.onrender.com/reanalyze", {
+        const res = await fetch("https://navalsheth.pythonanywhere.com/reanalyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1802,7 +1802,7 @@
       content.innerHTML = '<span class="loading"></span> Generating...';
 
       try {
-        const res = await fetch("https://math-ocr-final.onrender.com/generate_practice", {
+        const res = await fetch("https://navalsheth.pythonanywhere.com/generate_practice", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ analysis: analysisResult })
