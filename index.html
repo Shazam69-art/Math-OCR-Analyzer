@@ -69,19 +69,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, 
-        #667eea 0%,           /* Purple-Blue */
-        #764ba2 12.5%,        /* Purple */
-        #f093fb 25%,          /* Pink */
-        #f5576c 37.5%,        /* Red-Pink */
-        #38bdf8 50%,          /* Sky Blue (NEW) */
-        #fb923c 62.5%,        /* Orange (NEW) */
-        #f093fb 75%,          /* Pink */
-        #764ba2 87.5%,        /* Purple */
-        #667eea 100%          /* Purple-Blue */
-    );
-    background-size: 400% 400%;
-    animation: gradientShift 15s ease infinite;
+    background: #ffffff; /* Pure white background */
     position: relative;
     overflow: hidden;
 }
@@ -1165,6 +1153,98 @@
             color: var(--primary); 
             margin-bottom: 10px; 
         }
+        /* Loading Overlay Styles */
+#loadingOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(5px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.loading-content {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 40px;
+    box-shadow: var(--shadow-lg);
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+}
+
+.progress-container {
+    margin-bottom: 30px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 12px;
+    background: var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #4361ee, #3a56d4, #38bdf8, #fb923c);
+    border-radius: 6px;
+    animation: progressAnimation 3s ease-in-out infinite;
+}
+
+@keyframes progressAnimation {
+    0% {
+        width: 0%;
+        background: #4361ee;
+    }
+    25% {
+        width: 25%;
+        background: #3a56d4;
+    }
+    50% {
+        width: 50%;
+        background: #38bdf8;
+    }
+    75% {
+        width: 75%;
+        background: #fb923c;
+    }
+    100% {
+        width: 100%;
+        background: #4361ee;
+    }
+}
+
+.math-statements {
+    margin-top: 20px;
+}
+
+.math-statement {
+    font-size: 16px;
+    color: var(--muted-foreground);
+    margin: 10px 0;
+    opacity: 0;
+    animation: fadeInOut 1.5s ease-in-out infinite;
+}
+
+.math-statement:nth-child(1) { animation-delay: 0s; }
+.math-statement:nth-child(2) { animation-delay: 0.5s; }
+.math-statement:nth-child(3) { animation-delay: 1s; }
+.math-statement:nth-child(4) { animation-delay: 1.5s; }
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+}
+
+        
     </style>
 </head>
 <body>
@@ -1173,9 +1253,18 @@
         <div class="login-background"></div>
         <div class="login-container">
             <div class="login-header">
+                <div class="ai-mastery-text">AI Powered Math Mastery</div>
                 <div class="login-brand">CAS <span>Educations</span></div>
                 <p class="login-subtitle">AI-Powered Math Analysis Platform</p>
             </div>
+            .ai-mastery-text {
+    color: #4361ee; /* Full blue using your --primary variable color */
+    font-size: 42px; /* Medium to large size */
+    font-weight: 700;
+    margin-bottom: 20px;
+    text-align: center;
+    letter-spacing: -0.5px;
+}
             <div class="login-card">
                 <form id="loginForm" class="login-form">
                     <div class="form-group">
@@ -1527,37 +1616,74 @@
         }
 
         async function startAnalysis() {
-            if (isAnalyzing) return;
-            isAnalyzing = true;
-            const btn = document.getElementById('startAnalysisBtn');
-            btn.innerHTML = '<div class="loading"></div> Analyzing...';
-            btn.disabled = true;
-            const formData = new FormData();
-            allFiles = [...questionFiles, ...answerFiles];
-            allFiles.forEach(f => formData.append('files', f.file));
-            try {
-                const res = await fetch('https://navalsheth.pythonanywhere.com/analyze', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await res.json();
-                if (data.error) alert(data.error);
-                else {
-                    analysisResult = data;
-                    displayAnalysis(data);
-                    addToHistory();
-                    document.getElementById('uploadSection').classList.add('hidden');
-                    document.getElementById('resultsSection').classList.remove('hidden');
-                }
-            } catch (e) {
-                alert('Error: ' + e.message);
-            } finally {
-                isAnalyzing = false;
-                btn.innerHTML = `<svg style="width: 1.25rem; height: 1.25rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Start Analysis`;
-                btn.disabled = false;
-            }
+    if (isAnalyzing) return;
+    isAnalyzing = true;
+    const btn = document.getElementById('startAnalysisBtn');
+    
+    // Create and show loading overlay
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'loadingOverlay';
+    loadingOverlay.innerHTML = `
+        <div class="loading-content">
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <div class="math-statements">
+                    <p class="math-statement">Processing mathematical equations...</p>
+                    <p class="math-statement">Analyzing solution steps...</p>
+                    <p class="math-statement">Checking for calculation errors...</p>
+                    <p class="math-statement">Generating corrections...</p>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('uploadSection').appendChild(loadingOverlay);
+    
+    btn.innerHTML = '<div class="loading"></div> Analyzing...';
+    btn.disabled = true;
+    
+    const formData = new FormData();
+    allFiles = [...questionFiles, ...answerFiles];
+    allFiles.forEach(f => formData.append('files', f.file));
+    
+    try {
+        const res = await fetch('https://navalsheth.pythonanywhere.com/analyze', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            removeLoadingOverlay();
+        } else {
+            analysisResult = data;
+            displayAnalysis(data);
+            addToHistory();
+            
+            // Hide loading overlay and show results
+            setTimeout(() => {
+                removeLoadingOverlay();
+                document.getElementById('uploadSection').classList.add('hidden');
+                document.getElementById('resultsSection').classList.remove('hidden');
+            }, 500);
         }
+    } catch (e) {
+        alert('Error: ' + e.message);
+        removeLoadingOverlay();
+    } finally {
+        isAnalyzing = false;
+        btn.innerHTML = `<svg style="width: 1.25rem; height: 1.25rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Start Analysis`;
+        btn.disabled = false;
+    }
+}
 
+function removeLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
         function processSteps(str) {
             if (!str) return '';
             const steps = str.split('<br>').filter(step => step.trim() !== '');
