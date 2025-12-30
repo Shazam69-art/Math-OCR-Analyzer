@@ -104,23 +104,11 @@
     left: -50%;
     right: -50%;
     bottom: -50%;
-    background: 
-        radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.15) 0%, transparent 50%),
-        radial-gradient(circle at 80% 20%, rgba(118, 75, 162, 0.15) 0%, transparent 50%),
-        radial-gradient(circle at 40% 40%, rgba(240, 147, 251, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 60% 60%, rgba(245, 87, 108, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 30% 70%, rgba(56, 189, 248, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 70% 30%, rgba(251, 146, 60, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 10% 90%, rgba(56, 189, 248, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 90% 10%, rgba(251, 146, 60, 0.08) 0%, transparent 50%);
-    animation: float 20s infinite linear;
-    /* NO backdrop-filter HERE */
+    background: #ffffff; /* Pure white background - NO transparency */
+    /* REMOVE ALL the radial-gradient lines completely */
+    /* NO animation either */
 }
 
-@keyframes float {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
 
         .login-container {
             position: relative;
@@ -1283,6 +1271,13 @@
                         </svg>
                         Login to Dashboard
                     </button>
+                    <!-- ADD THIS BUTTON RIGHT AFTER THE LOGIN BUTTON -->
+                    <button type="button" class="login-btn" onclick="showRegisterModal()" style="margin-top: 16px; background: var(--primary);">
+                        <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                        </svg>
+                        Register New Account
+                    </button>
                 </form>
                 <div class="social-login">
                     <div class="social-login-title">Or continue with</div>
@@ -1484,7 +1479,48 @@
             <button class="btn-outline" style="width: 100%; margin-top: 1rem;" onclick="closeImageModal()">Close</button>
         </div>
     </div>
+    <!-- Register Modal -->
+<div id="registerModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create New Account</h3>
+        </div>
+        <form id="registerForm">
+            <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" id="registerUsername" class="form-input" placeholder="Choose a username" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Phone Number</label>
+                <input type="tel" id="registerPhone" class="form-input" placeholder="Enter your phone number" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" id="registerPassword" class="form-input" placeholder="Create a password" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Confirm Password</label>
+                <input type="password" id="registerConfirmPassword" class="form-input" placeholder="Confirm your password" required>
+            </div>
+            <div class="form-group" style="text-align: center;">
+                <button type="submit" class="login-btn" style="width: 100%;">
+                    <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Proceed to Register
+                </button>
+            </div>
+        </form>
+        <div id="registerSuccessMessage" style="display: none; text-align: center; padding: 20px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; margin-top: 20px;">
+            <h4 style="color: #10b981;">✓ User Registered Successfully!</h4>
+            <p>You can now close this window and login with your credentials.</p>
+            <button class="btn-outline" style="margin-top: 16px;" onclick="closeRegisterModal()">Close</button>
+        </div>
+        <button class="btn-outline" style="width: 100%; margin-top: 1rem;" onclick="closeRegisterModal()">Cancel</button>
+    </div>
+</div>
 
+    
     <script>
         // Login Functions
         document.getElementById('loginForm').addEventListener('submit', function(e) {
@@ -1511,6 +1547,8 @@
             document.getElementById('dashboardPage').style.display = 'flex';
             document.getElementById('userName').textContent = displayName;
         });
+        
+        
 
         function socialLogin(provider) {
             // Dummy social login - accept any
@@ -1536,6 +1574,62 @@
                 currentUser = savedUser;
             }
         });
+        // Registration functions
+function showRegisterModal() {
+    document.getElementById('registerModal').classList.add('open');
+    // Reset form
+    document.getElementById('registerForm').reset();
+    document.getElementById('registerSuccessMessage').style.display = 'none';
+}
+
+function closeRegisterModal() {
+    document.getElementById('registerModal').classList.remove('open');
+}
+
+// Handle registration form submission
+document.getElementById('registerForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('registerUsername').value.trim();
+    const phone = document.getElementById('registerPhone').value.trim();
+    const password = document.getElementById('registerPassword').value;
+    const confirmPassword = document.getElementById('registerConfirmPassword').value;
+    
+    // Basic validation
+    if (!username || !phone || !password) {
+        alert('Please fill in all fields');
+        return;
+    }
+    
+    if (password !== confirmPassword) {
+        alert('Passwords do not match');
+        return;
+    }
+    
+    if (password.length < 6) {
+        alert('Password must be at least 6 characters');
+        return;
+    }
+    
+    // In a real app, you would send this to your backend
+    // For demo purposes, we'll just store in localStorage
+    const userData = {
+        username: username,
+        phone: phone,
+        password: password, // Note: In real app, NEVER store passwords in plain text
+        registeredAt: new Date().toISOString()
+    };
+    
+    // Store in localStorage (for demo only)
+    localStorage.setItem('registeredUser_' + username, JSON.stringify(userData));
+    
+    // Show success message
+    document.getElementById('registerSuccessMessage').style.display = 'block';
+    document.getElementById('registerForm').style.display = 'none';
+    
+    // Auto-fill login form
+    document.getElementById('loginUsername').value = username;
+});
 
         // State management
         let questionFiles = [];
