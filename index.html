@@ -267,11 +267,6 @@
             <div class="main-content">
                 <header class="header">
                     <div class="header-left">
-                        <button class="mobile-menu-btn" style="display:none;" onclick="openMobileMenu()">
-                            <svg style="width: 1.25rem; height: 1.25rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                            </svg>
-                        </button>
                         <div class="header-logo" onclick="resetToDashboard()">
                             <div class="header-logo-icon">
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -378,34 +373,39 @@
 
         function handleLogin() {
             const username = document.getElementById('usernameInput').value.trim();
-            const password = document.getElementById('passwordInput').value;
             if (!username) {
                 alert('Please enter a username or email');
                 return;
             }
-            // Dummy login - accept anything
+            // Dummy login - accept any non-empty username
             let displayName = username;
             if (username.includes('@')) {
-                displayName = username.split('@')[0];
+                displayName = username.split('@')[0].trim();
             }
-            displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+            // Capitalize only the first letter
+            if (displayName.length > 0) {
+                displayName = displayName[0].toUpperCase() + displayName.slice(1);
+            }
             currentUser = displayName;
             localStorage.setItem('userEmailPrefix', displayName);
             document.getElementById('userName').textContent = displayName;
+
             document.getElementById('loginPage').classList.add('hidden');
             document.getElementById('dashboardPage').classList.remove('hidden');
         }
 
         function handleLogout() {
             localStorage.removeItem('userEmailPrefix');
+            currentUser = '';
             document.getElementById('dashboardPage').classList.add('hidden');
             document.getElementById('loginPage').classList.remove('hidden');
             document.getElementById('usernameInput').value = '';
             document.getElementById('passwordInput').value = '';
+            document.getElementById('userName').textContent = '';
         }
 
-        // Check if already logged in
-        window.onload = () => {
+        // On page load, check for saved user
+        window.addEventListener('load', () => {
             const saved = localStorage.getItem('userEmailPrefix');
             if (saved) {
                 currentUser = saved;
@@ -413,7 +413,7 @@
                 document.getElementById('loginPage').classList.add('hidden');
                 document.getElementById('dashboardPage').classList.remove('hidden');
             }
-        };
+        });
 
         function renderMath(element) {
             if (window.MathJax) {
@@ -426,7 +426,7 @@
             document.getElementById('resultsSection').classList.add('hidden');
         }
 
-        // File handling (unchanged)
+        // File handling
         document.getElementById('questionInput').addEventListener('change', async e => {
             await handleFileUpload(e.target.files, questionFiles, 'questionFileList');
             checkStartButton();
@@ -610,7 +610,6 @@
                                 <button class="btn-outline" onclick="downloadPracticePaper()">Download as PDF</button>
                             </div>
                         </div>`;
-                    // Critical fix: Wait for MathJax to finish typesetting before PDF generation
                     renderMath(document.getElementById('practice-paper'));
                 }
             } catch (e) {
@@ -629,7 +628,6 @@
             document.body.appendChild(loading);
 
             try {
-                // Wait for MathJax to fully render
                 await MathJax.typesetPromise([practicePaper]);
 
                 const canvas = await html2canvas(practicePaper, {
