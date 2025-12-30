@@ -142,7 +142,62 @@
             margin-bottom: 20px;
             text-align: center;
             letter-spacing: -0.5px;
-        } 
+        }
+        .register-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.register-btn:hover {
+    background: #3a56d4;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.register-btn:active {
+    transform: translateY(0);
+}
+
+.math-background-left,
+.math-background-right {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(0, 0, 0, 0.1);
+    font-size: 1.5rem;
+    pointer-events: none;
+    z-index: 0;
+    width: 30%;
+    text-align: center;
+}
+
+.math-background-left {
+    left: 5%;
+}
+
+.math-background-right {
+    right: 5%;
+}
+
+@media (max-width: 1024px) {
+    .math-background-left,
+    .math-background-right {
+        display: none;
+    }
+}
 
         .login-brand {
             font-size: 32px;
@@ -1260,6 +1315,19 @@
     <!-- Login Page -->
     <div id="loginPage">
         <div class="login-background"></div>
+        <!-- Mathematical Background Left -->
+    <div class="math-background-left" id="mathLeft">
+        $$e^{i\pi} + 1 = 0$$
+        $$\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}$$
+        $$\nabla \cdot \mathbf{E} = \frac{\rho}{\varepsilon_0}$$
+    </div>
+    
+    <!-- Mathematical Background Right -->
+    <div class="math-background-right" id="mathRight">
+        $$\frac{d}{dx} e^x = e^x$$
+        $$F = ma$$
+        $$\psi(x,t) = A e^{i(kx - \omega t)}$$
+    </div>
         <div class="login-container">
             <div class="login-header">
                 <div class="ai-mastery-text">AI Powered Math Mastery</div>
@@ -1268,45 +1336,52 @@
             </div>
             
             <div class="login-card">
-                <form id="loginForm" class="login-form">
-                    <div class="form-group">
-                        <label class="form-label">Email or Username</label>
-                        <input type="text" id="loginUsername" class="form-input" placeholder="Enter your email or username" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" required>
-                    </div>
-                    <button type="submit" class="login-btn">
-                        <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
-                        </svg>
-                        Login to Dashboard
-                    </button>
-                </form>
-                <div class="social-login">
-                    <div class="social-login-title">Or continue with</div>
-                    <div class="social-buttons">
-                        <button class="social-btn google-btn" onclick="socialLogin('google')">
-                            <svg viewBox="0 0 24 24" width="20" height="20">
-                                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                            </svg>
-                            Google
-                        </button>
-                        <button class="social-btn apple-btn" onclick="socialLogin('apple')">
-                            <svg viewBox="0 0 24 24" width="20" height="20">
-                                <path fill="currentColor" d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.31-2.33 1.05-3.11z"/>
-                            </svg>
-                            Apple
-                        </button>
-                    </div>
-                </div>
-            </div>
+    <form id="loginForm" class="login-form">
+        <div class="form-group">
+            <label class="form-label">Email or Username</label>
+            <input type="text" id="loginUsername" class="form-input" placeholder="Enter your email or username" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" required>
+        </div>
+        <button type="submit" class="login-btn">
+            <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+            </svg>
+            Login to Dashboard
+        </button>
+    </form>
+    
+    <!-- Register Button -->
+    <button class="register-btn" onclick="openRegisterModal()">
+        <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+        </svg>
+        Create New Account
+    </button>
+    
+    <div class="social-login">
+        <div class="social-login-title">Or continue with</div>
+        <div class="social-buttons">
+            <button class="social-btn google-btn" onclick="socialLogin('google')">
+                <svg viewBox="0 0 24 24" width="20" height="20">
+                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Google
+            </button>
+            <button class="social-btn apple-btn" onclick="socialLogin('apple')">
+                <svg viewBox="0 0 24 24" width="20" height="20">
+                    <path fill="currentColor" d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.31-2.33 1.05-3.11z"/>
+                </svg>
+                Apple
+            </button>
         </div>
     </div>
+</div>
 
     <!-- Dashboard (Initially Hidden) -->
     <div id="dashboardPage" class="dashboard-container">
@@ -1525,7 +1600,65 @@
             document.getElementById('dashboardPage').style.display = 'flex';
             document.getElementById('userName').textContent = displayName;
         }
+        // Registration Functions
+        function openRegisterModal() {
+            document.getElementById('registerModal').classList.add('open');
+        }
+        
+        function closeRegisterModal() {
+            document.getElementById('registerModal').classList.remove('open');
+            document.getElementById('registerForm').reset();
+        }
+        
+        function closeRegisterSuccessModal() {
+            document.getElementById('registerSuccessModal').classList.remove('open');
+            closeRegisterModal();
+        }
+        
+        // Handle registration form submission
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const phone = document.getElementById('registerPhone').value.trim();
+            const username = document.getElementById('registerUsername').value.trim();
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('registerConfirmPassword').value;
+            
+            // Basic validation
+            if (phone.length < 10) {
+                alert('Please enter a valid phone number');
+                return;
+            }
+            
+            if (username.length < 3) {
+                alert('Username must be at least 3 characters long');
+                return;
+            }
+            
+            if (password.length < 6) {
+                alert('Password must be at least 6 characters long');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                alert('Passwords do not match');
+                return;
+            }
+            
+            // In a real application, you would send this to your server
+            // For demo purposes, we'll just show success message
+            console.log('Registration attempt:', { phone, username, password });
+            
+            // Close register modal and show success modal
+            closeRegisterModal();
+            document.getElementById('registerSuccessModal').classList.add('open');
+            
+            // Auto-fill login form with new credentials
+            document.getElementById('loginUsername').value = username;
+            document.getElementById('loginPassword').value = password;
+        });
 
+        // Check if already logged in
         // Check if already logged in
         window.addEventListener('DOMContentLoaded', () => {
             const savedUser = localStorage.getItem('userEmailPrefix');
@@ -1534,8 +1667,12 @@
                 document.getElementById('dashboardPage').style.display = 'flex';
                 document.getElementById('userName').textContent = savedUser;
                 currentUser = savedUser;
+            } else {
+                // Initialize mathematical equations rotation
+                rotateMathEquations();
             }
         });
+        
 
         // State management
         let questionFiles = [];
@@ -1950,5 +2087,67 @@ function removeLoadingOverlay() {
             document.getElementById('mobileHistoryList').innerHTML = html;
         }
     </script>
+    <!-- Register Modal -->
+<div id="registerModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create New Account</h3>
+        </div>
+        <form id="registerForm" class="login-form">
+            <div class="form-group">
+                <label class="form-label">Phone Number</label>
+                <input type="tel" id="registerPhone" class="form-input" placeholder="Enter your phone number" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" id="registerUsername" class="form-input" placeholder="Choose a username" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" id="registerPassword" class="form-input" placeholder="Create a password" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Confirm Password</label>
+                <input type="password" id="registerConfirmPassword" class="form-input" placeholder="Confirm your password" required>
+            </div>
+            <button type="submit" class="login-btn">
+                <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                </svg>
+                Create Account
+            </button>
+        </form>
+        <button class="btn-outline" style="width: 100%; margin-top: 1rem;" onclick="closeRegisterModal()">Cancel</button>
+    </div>
+</div>
+
+<!-- Registration Success Modal -->
+<div id="registerSuccessModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Account Created Successfully! ✅</h3>
+        </div>
+        <div class="analysis-section" style="text-align: center;">
+            <div class="solution-card corrected">
+                <p style="font-size: 16px; margin-bottom: 16px;">
+                    Your account has been created successfully! You can now login with these credentials.
+                </p>
+                <p style="font-size: 14px; color: var(--muted-foreground); margin-bottom: 8px;">
+                    <strong>Please ensure you remember your login details.</strong>
+                </p>
+                <p style="font-size: 14px; color: var(--muted-foreground);">
+                    You can proceed to login with your username and password.
+                </p>
+            </div>
+        </div>
+        <button class="login-btn" style="width: 100%; margin-top: 1rem;" onclick="closeRegisterSuccessModal()">
+            <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+            </svg>
+            Proceed to Login
+        </button>
+    </div>
+</div>
+
 </body>
 </html>
