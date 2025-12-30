@@ -64,78 +64,28 @@
         }
 
         /* Login Page Styles */
+            /* Login Page Styles - REMOVE GRADIENT, MAKE WHITE */
         #loginPage {
     height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, 
-        #667eea 0%,           /* Purple-Blue */
-        #764ba2 12.5%,        /* Purple */
-        #f093fb 25%,          /* Pink */
-        #f5576c 37.5%,        /* Red-Pink */
-        #38bdf8 50%,          /* Sky Blue (NEW) */
-        #fb923c 62.5%,        /* Orange (NEW) */
-        #f093fb 75%,          /* Pink */
-        #764ba2 87.5%,        /* Purple */
-        #667eea 100%          /* Purple-Blue */
-    );
-    background-size: 400% 400%;
-    animation: gradientShift 15s ease infinite;
+    background: white; /* CHANGED FROM GRADIENT TO WHITE */
     position: relative;
     overflow: hidden;
 }
-        /* Dashboard Background Animations */
-                /* Dashboard Background Animations */
+                /* Dashboard Background - REMOVE ALL ANIMATIONS, MAKE WHITE */
         .dashboard-container {
             position: relative;
             overflow: hidden;
+            background: white; /* ADD WHITE BACKGROUND */
         }
         
-        .dashboard-background {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: -1;
-            pointer-events: none;
-            /* ADD THE ANIMATED GRADIENT BACKGROUND */
-            background: linear-gradient(135deg, 
-                #667eea 0%,           /* Purple-Blue */
-                #764ba2 12.5%,        /* Purple */
-                #f093fb 25%,          /* Pink */
-                #f5576c 37.5%,        /* Red-Pink */
-                #38bdf8 50%,          /* Sky Blue (NEW) */
-                #fb923c 62.5%,        /* Orange (NEW) */
-                #f093fb 75%,          /* Pink */
-                #764ba2 87.5%,        /* Purple */
-                #667eea 100%          /* Purple-Blue */
-            );
-            background-size: 400% 400%;
-            animation: gradientShift 15s ease infinite;
-        }
+        /* REMOVE ENTIRE .dashboard-background SECTION */
+        /* .dashboard-background { ... } */
+        /* .dashboard-background::before { ... } */
         
-        .dashboard-background::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            right: -50%;
-            bottom: -50%;
-            /* KEEP THE RADIAL GRADIENTS BUT MAKE THEM MORE VISIBLE */
-            background: 
-                radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(118, 75, 162, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(240, 147, 251, 0.12) 0%, transparent 50%),
-                radial-gradient(circle at 60% 60%, rgba(245, 87, 108, 0.12) 0%, transparent 50%),
-                radial-gradient(circle at 30% 70%, rgba(56, 189, 248, 0.12) 0%, transparent 50%),
-                radial-gradient(circle at 70% 30%, rgba(251, 146, 60, 0.12) 0%, transparent 50%),
-                radial-gradient(circle at 10% 90%, rgba(56, 189, 248, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 90% 10%, rgba(251, 146, 60, 0.1) 0%, transparent 50%);
-            animation: float 25s infinite linear;
-        }
-        
+        /* Keep only this part: */
         /* Ensure content is above background */
         .dashboard-layout,
         .header,
@@ -172,9 +122,8 @@
         }
         
         .content-area {
-            background: transparent;
+            background: white; /* CHANGE TO WHITE */
         }
-
         
         @keyframes gradientShift {
     0% { background-position: 0% 50%; }
@@ -1261,13 +1210,125 @@
             margin-bottom: 10px; 
         }
     </style>
+            .practice-question-number { 
+            font-size: 18px; 
+            font-weight: 700; 
+            color: var(--primary); 
+            margin-bottom: 10px; 
+        }
+        
+        /* Analysis Progression Animation Styles */
+        .analysis-progression {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        
+        .analysis-progression.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .progression-container {
+            text-align: center;
+            max-width: 600px;
+            padding: 40px;
+        }
+        
+        .progression-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: var(--primary);
+        }
+        
+        .progression-statement {
+            font-size: 22px;
+            font-weight: 600;
+            margin: 20px 0;
+            padding: 15px 25px;
+            border-radius: 12px;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: statementAppear 0.8s forwards;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        @keyframes statementAppear {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .statement-1 { 
+            background: linear-gradient(135deg, #667eea, #764ba2); 
+            color: white;
+            animation-delay: 0.2s;
+        }
+        .statement-2 { 
+            background: linear-gradient(135deg, #f093fb, #f5576c); 
+            color: white;
+            animation-delay: 3s;
+        }
+        .statement-3 { 
+            background: linear-gradient(135deg, #38bdf8, #fb923c); 
+            color: white;
+            animation-delay: 6s;
+        }
+        .statement-4 { 
+            background: linear-gradient(135deg, #10b981, #3b82f6); 
+            color: white;
+            animation-delay: 9s;
+        }
+        .statement-5 { 
+            background: linear-gradient(135deg, #8b5cf6, #ec4899); 
+            color: white;
+            animation-delay: 12s;
+        }
+        
+        .progression-loading {
+            margin-top: 40px;
+            font-size: 18px;
+            color: var(--muted-foreground);
+        }
+    </style>
+
+    
 </head>
 <body>
     <!-- Login Page -->
     <div id="loginPage">
         <div class="login-background"></div>
         <div class="login-container">
+            <!-- ADD MATH SYMBOLS ON LEFT AND RIGHT -->
+            <div style="position: absolute; left: 10%; top: 50%; transform: translateY(-50%); z-index: 0; opacity: 0.7; font-size: 32px;">
+                $$\oint_C \frac{f(z)}{(z-a)^n} dz = 2\pi i f^{(n-1)}(a)$$
+            </div>
+            
+            <div style="position: absolute; right: 10%; top: 50%; transform: translateY(-50%); z-index: 0; opacity: 0.7; font-size: 32px;">
+                $$\nabla \times \mathbf{E} = -\frac{\partial \mathbf{B}}{\partial t}$$
+            </div>
             <div class="login-header">
+                <div class="login-header">
+                <!-- ADD NEW TITLE -->
+                <div style="font-size: 42px; font-weight: 800; color: var(--primary); margin-bottom: 10px; letter-spacing: -1px;">
+                    AI Powered Math Mastery
+                </div>
+                <div class="login-brand">CAS <span>Educations</span></div>
+                <p class="login-subtitle">Advanced Mathematical Analysis Platform</p>
+            </div>
                 <div class="login-brand">CAS <span>Educations</span></div>
                 <p class="login-subtitle">AI-Powered Math Analysis Platform</p>
             </div>
@@ -1324,10 +1385,9 @@
     </div>
 
        <!-- Dashboard (Initially Hidden) -->
-    <div id="dashboardPage" class="dashboard-container">
-        <!-- ADD BACKGROUND ANIMATIONS -->
-        <div class="dashboard-background"></div>
-        <!-- END BACKGROUND -->
+      <div id="dashboardPage" class="dashboard-container">
+        <!-- REMOVE THIS BACKGROUND DIV -->
+        <!-- <div class="dashboard-background"></div> -->
         <div class="dashboard-layout">
             <!-- Sidebar (Desktop) -->
             <aside class="sidebar">
@@ -1487,9 +1547,30 @@
             </div>
         </div>
     </div>
+            </div>
+    </div>
+    
+    <!-- Analysis Progression Overlay -->
+    <div id="analysisProgression" class="analysis-progression">
+        <div class="progression-container">
+            <div class="progression-title">AI Analysis in Progress</div>
+            <div class="progression-statement statement-1">Analyzing mathematical patterns...</div>
+            <div class="progression-statement statement-2">Processing symbolic equations...</div>
+            <div class="progression-statement statement-3">Validating solution steps...</div>
+            <div class="progression-statement statement-4">Identifying conceptual gaps...</div>
+            <div class="progression-statement statement-5">Generating insights and corrections...</div>
+            <div class="progression-loading">
+                <div class="loading" style="width: 30px; height: 30px; margin: 20px auto;"></div>
+                Please wait while our AI analyzes the answer sheets...
+            </div>
+        </div>
+    </div>
     
     <!-- Image Modal -->
     <div id="imageModal" class="modal">
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal">
+        
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="modalTitle">Answer Sheet - Question</h3>
@@ -1660,38 +1741,55 @@
             document.getElementById('startAnalysisBtn').disabled = questionFiles.length === 0 || answerFiles.length === 0;
         }
 
-        async function startAnalysis() {
+                async function startAnalysis() {
             if (isAnalyzing) return;
             isAnalyzing = true;
+            
+            // Show progression overlay
+            const progressionOverlay = document.getElementById('analysisProgression');
+            progressionOverlay.classList.add('active');
+            
             const btn = document.getElementById('startAnalysisBtn');
             btn.innerHTML = '<div class="loading"></div> Analyzing...';
             btn.disabled = true;
+            
             const formData = new FormData();
             allFiles = [...questionFiles, ...answerFiles];
             allFiles.forEach(f => formData.append('files', f.file));
+            
             try {
                 const res = await fetch('https://navalsheth.pythonanywhere.com/analyze', {
                     method: 'POST',
                     body: formData
                 });
                 const data = await res.json();
-                if (data.error) alert(data.error);
-                else {
+                
+                if (data.error) {
+                    alert(data.error);
+                    progressionOverlay.classList.remove('active');
+                } else {
                     analysisResult = data;
-                    displayAnalysis(data);
-                    addToHistory();
-                    document.getElementById('uploadSection').classList.add('hidden');
-                    document.getElementById('resultsSection').classList.remove('hidden');
+                    
+                    // Hide progression overlay
+                    progressionOverlay.classList.remove('active');
+                    
+                    // Wait a moment before showing results
+                    setTimeout(() => {
+                        displayAnalysis(data);
+                        addToHistory();
+                        document.getElementById('uploadSection').classList.add('hidden');
+                        document.getElementById('resultsSection').classList.remove('hidden');
+                    }, 500);
                 }
             } catch (e) {
                 alert('Error: ' + e.message);
+                progressionOverlay.classList.remove('active');
             } finally {
                 isAnalyzing = false;
                 btn.innerHTML = `<svg style="width: 1.25rem; height: 1.25rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Start Analysis`;
                 btn.disabled = false;
             }
         }
-
         function processSteps(str) {
             if (!str) return '';
             const steps = str.split('<br>').filter(step => step.trim() !== '');
