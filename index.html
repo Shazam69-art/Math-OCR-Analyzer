@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CAS Educations - Math.AI Analyzer</title>
+    <title>Math.AI Analyzer - CAS Educations</title>
     <script>
         window.MathJax = {
             tex: {
@@ -49,9 +49,9 @@
             --sidebar-accent: #f0f2ff;
             --sidebar-border: #ebebed;
             --radius: 0.75rem;
-            --glass: rgba(255, 255, 255, 0.15);
+            --login-bg: linear-gradient(135deg, rgba(79, 124, 255, 0.1), rgba(139, 92, 246, 0.05));
+            --glassmorphism: rgba(255, 255, 255, 0.8);
             --glass-border: rgba(255, 255, 255, 0.2);
-            --glass-bg: rgba(255, 255, 255, 0.7);
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
@@ -61,28 +61,29 @@
             padding: 0;
             overflow: hidden;
         }
-        .login-page {
+        /* Login Screen */
+        .login-container {
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background: linear-gradient(135deg, #f0f8ff 0%, #e6f0ff 100%);
-            padding: 1rem;
+            background: var(--login-bg);
+            padding: 2rem;
         }
         .login-card {
             width: 100%;
             max-width: 400px;
-            background: var(--glass-bg);
+            background: var(--glassmorphism);
             backdrop-filter: blur(10px);
             border-radius: var(--radius);
             border: 1px solid var(--glass-border);
-            padding: 2rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 2.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
             text-align: center;
         }
         .login-header {
             margin-bottom: 2rem;
-            font-size: 1.5rem;
+            font-size: 1.75rem;
             font-weight: 700;
             color: var(--primary);
         }
@@ -93,11 +94,12 @@
         }
         .login-input {
             width: 100%;
-            padding: 0.75rem;
+            padding: 0.875rem 1rem;
             border: 1px solid var(--border);
             border-radius: calc(var(--radius) - 0.25rem);
             font-size: 0.875rem;
             background-color: var(--card);
+            transition: border-color 0.2s;
         }
         .login-input:focus {
             outline: none;
@@ -105,12 +107,13 @@
         }
         .login-button {
             width: 100%;
-            padding: 0.75rem;
+            padding: 0.875rem;
             background-color: var(--primary);
             color: var(--primary-foreground);
             border: none;
             border-radius: calc(var(--radius) - 0.25rem);
             font-weight: 500;
+            font-size: 0.875rem;
             cursor: pointer;
             transition: opacity 0.2s;
         }
@@ -124,15 +127,18 @@
             margin-top: 1.5rem;
         }
         .social-button {
-            width: 100%;
-            padding: 0.75rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
+            width: 100%;
+            padding: 0.75rem;
             border: 1px solid var(--border);
             border-radius: calc(var(--radius) - 0.25rem);
             background-color: var(--card);
+            color: var(--foreground);
+            font-weight: 500;
+            font-size: 0.875rem;
             cursor: pointer;
             transition: background-color 0.2s;
         }
@@ -143,6 +149,7 @@
             width: 1.25rem;
             height: 1.25rem;
         }
+        /* Dashboard */
         .dashboard-container { display: flex; height: 100vh; width: 100%; overflow: hidden; }
         .dashboard-layout { display: flex; height: 100%; width: 100%; }
         .sidebar { width: 16rem; background-color: var(--sidebar); border-right: 1px solid var(--sidebar-border); display: flex; flex-direction: column; height: 100%; }
@@ -275,60 +282,13 @@
         .practice-subtitle { font-size: 16px; color: #666; }
         .practice-question { margin-bottom: 30px; }
         .practice-question-number { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 10px; }
-        .chat-sidebar {
-            width: 320px;
-            background-color: var(--sidebar);
-            border-left: 1px solid var(--sidebar-border);
-            padding: 1rem;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            position: fixed;
-            right: 0;
-            top: 0;
-        }
-        .chat-header {
-            padding: 1rem;
-            border-bottom: 1px solid var(--sidebar-border);
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }
-        .chat-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 0.5rem;
-        }
-        .chat-message {
-            background-color: var(--card);
-            border-radius: var(--radius);
-            padding: 0.75rem;
-            margin-bottom: 0.75rem;
-            font-size: 0.875rem;
-            line-height: 1.6;
-        }
-        .chat-input {
-            display: flex;
-            padding: 1rem;
-            border-top: 1px solid var(--sidebar-border);
-        }
-        .chat-input input {
-            flex: 1;
-            padding: 0.5rem;
-            border: 1px solid var(--border);
-            border-radius: calc(var(--radius) - 0.25rem);
-            font-size: 0.875rem;
-        }
-        .chat-input button {
-            margin-left: 0.5rem;
-            padding: 0.5rem 1rem;
-        }
     </style>
 </head>
 <body>
-    <!-- Login Page -->
-    <div id="loginPage" class="login-page">
+    <!-- Login Screen -->
+    <div id="loginPage" class="login-container">
         <div class="login-card">
-            <div class="login-header">CAS Educations</div>
+            <h1 class="login-header">CAS Educations</h1>
             <form class="login-form" onsubmit="handleLogin(event)">
                 <input type="text" class="login-input" id="username" placeholder="Username" required>
                 <input type="password" class="login-input" id="password" placeholder="Password" required>
@@ -336,25 +296,18 @@
             </form>
             <div class="social-login">
                 <button class="social-button" onclick="handleSocialLogin('google')">
-                    <svg class="social-icon" viewBox="0 0 24 24" fill="#4285F4">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                    </svg>
+                    <img class="social-icon" src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google">
                     Continue with Google
                 </button>
                 <button class="social-button" onclick="handleSocialLogin('apple')">
-                    <svg class="social-icon" viewBox="0 0 24 24" fill="#000000">
-                        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2.01.67-3.34 1.04C7.29 21.17 5.96 19.92 5 18.01 3.65 15.6 3 12.82 3 10c0-2.82 1.87-5.07 4.63-5.11 1.34-.02 2.28.57 3.5 1.09 1.22.52 2.8.09 4.25-.09.43-.05.86-.07 1.3-.07 1.13 0 2.65.18 3.58.74.93.56 1.47 1.66 2.05 2.44-1.99.02-4.15-.79-5.4-2.15-.48-.51-.95-1.46-.95-2.85 0-.84.19-1.52.39-2.05-2.71-.25-6.04-.27-9.18-.26-3.25 0-5.58.25-7.6.94.46 1.97.94 4.1.94 6.4 0 2.23-.45 4.15-.94 5.87.91-.69 3.14-1.06 5.34-1.25 1.8-.15 3.4-.2 4.9-.2 4.62 0 8.37.01 11.74.01 1.16 0 2.3-.19 3.38-.58.85-.32 1.59-.9 2.09-1.65-.01 1.8-.01 4.15-.01 6.47 0 1.16-.19 2.3-.58 3.38z" fill="currentColor"/>
-                    </svg>
+                    <img class="social-icon" src="https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" alt="Apple">
                     Continue with Apple
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Dashboard Page -->
+    <!-- Dashboard -->
     <div id="dashboardPage" class="dashboard-container hidden">
         <div class="dashboard-layout">
             <!-- Sidebar (Desktop) -->
@@ -507,19 +460,9 @@
                         </div>
                     </div>
                 </main>
-                <!-- Chat Sidebar -->
-                <div class="chat-sidebar">
-                    <div class="chat-header">Chat with AI</div>
-                    <div class="chat-messages" id="chatMessages"></div>
-                    <div class="chat-input">
-                        <input type="text" id="chatInput" placeholder="Ask a question...">
-                        <button class="btn-primary" onclick="sendChatMessage()">Send</button>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
-
     <!-- Image Modal -->
     <div id="imageModal" class="modal">
         <div class="modal-content">
@@ -534,7 +477,6 @@
             <button class="btn-outline" style="width: 100%; margin-top: 1rem;" onclick="closeImageModal()">Close</button>
         </div>
     </div>
-
     <script>
         // State management
         let currentUser = localStorage.getItem('userEmailPrefix') || '';
@@ -545,44 +487,31 @@
         let practiceResult = null;
         let history = [];
         let isAnalyzing = false;
-        let chatMessages = [];
 
-        // Initialize UI
-        document.addEventListener('DOMContentLoaded', () => {
-            if (currentUser) {
-                showDashboard();
-                document.getElementById('userName').textContent = currentUser;
-            } else {
-                showLogin();
-            }
-        });
-
-        function showLogin() {
-            document.getElementById('loginPage').classList.remove('hidden');
-            document.getElementById('dashboardPage').classList.add('hidden');
-        }
-
-        function showDashboard() {
-            document.getElementById('loginPage').classList.add('hidden');
-            document.getElementById('dashboardPage').classList.remove('hidden');
-        }
-
+        // Login Logic
         function handleLogin(e) {
             e.preventDefault();
             const username = document.getElementById('username').value;
             const displayName = username.includes('@') ? username.split('@')[0] : username;
             localStorage.setItem('userEmailPrefix', displayName);
-            currentUser = displayName;
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('dashboardPage').classList.remove('hidden');
             document.getElementById('userName').textContent = displayName;
-            showDashboard();
         }
 
         function handleSocialLogin(provider) {
             const displayName = provider === 'google' ? 'Google User' : 'Apple User';
             localStorage.setItem('userEmailPrefix', displayName);
-            currentUser = displayName;
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('dashboardPage').classList.remove('hidden');
             document.getElementById('userName').textContent = displayName;
-            showDashboard();
+        }
+
+        // Initialize
+        document.getElementById('userName').textContent = currentUser;
+        if (currentUser) {
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('dashboardPage').classList.remove('hidden');
         }
 
         function renderMath(element) {
@@ -600,7 +529,7 @@
         }
         function handleLogout() {
             localStorage.removeItem('userEmailPrefix');
-            showLogin();
+            window.location.reload();
         }
         function resetToDashboard() {
             document.getElementById('uploadSection').classList.remove('hidden');
@@ -868,10 +797,12 @@
             });
             document.body.appendChild(loading);
             try {
-                // Fix: Remove MathJax elements before capture
+                // Fix for MathJax rendering twice in PDF
                 const mathElements = practicePaper.querySelectorAll('.MathJax');
-                mathElements.forEach(el => el.style.visibility = 'hidden');
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                mathElements.forEach(el => {
+                    el.style.visibility = 'hidden';
+                });
+                await new Promise(resolve => setTimeout(resolve, 500));
                 const canvas = await html2canvas(practicePaper, {
                     scale: 2,
                     useCORS: true,
@@ -886,8 +817,9 @@
                         );
                     }
                 });
-                // Restore MathJax elements
-                mathElements.forEach(el => el.style.visibility = 'visible');
+                mathElements.forEach(el => {
+                    el.style.visibility = 'visible';
+                });
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF('p', 'mm', 'a4');
                 const imgData = canvas.toDataURL('image/png');
@@ -918,31 +850,6 @@
             `).join('');
             document.getElementById('historyList').innerHTML = html;
             document.getElementById('mobileHistoryList').innerHTML = html;
-        }
-
-        // Chat functions
-        function sendChatMessage() {
-            const input = document.getElementById('chatInput');
-            const message = input.value.trim();
-            if (!message) return;
-            chatMessages.push({role: 'user', content: message});
-            updateChat();
-            input.value = '';
-            // Simulate AI response
-            setTimeout(() => {
-                chatMessages.push({role: 'ai', content: "I'm here to help with your math analysis. What would you like to know?"});
-                updateChat();
-            }, 1000);
-        }
-
-        function updateChat() {
-            const container = document.getElementById('chatMessages');
-            container.innerHTML = chatMessages.map(msg => `
-                <div class="chat-message ${msg.role}">
-                    <p>${msg.content}</p>
-                </div>
-            `).join('');
-            container.scrollTop = container.scrollHeight;
         }
     </script>
 </body>
