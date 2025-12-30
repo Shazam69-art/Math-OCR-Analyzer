@@ -86,6 +86,7 @@
     overflow: hidden;
 }
         /* Dashboard Background Animations */
+                /* Dashboard Background Animations */
         .dashboard-container {
             position: relative;
             overflow: hidden;
@@ -99,6 +100,20 @@
             bottom: 0;
             z-index: -1;
             pointer-events: none;
+            /* ADD THE ANIMATED GRADIENT BACKGROUND */
+            background: linear-gradient(135deg, 
+                #667eea 0%,           /* Purple-Blue */
+                #764ba2 12.5%,        /* Purple */
+                #f093fb 25%,          /* Pink */
+                #f5576c 37.5%,        /* Red-Pink */
+                #38bdf8 50%,          /* Sky Blue (NEW) */
+                #fb923c 62.5%,        /* Orange (NEW) */
+                #f093fb 75%,          /* Pink */
+                #764ba2 87.5%,        /* Purple */
+                #667eea 100%          /* Purple-Blue */
+            );
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
         }
         
         .dashboard-background::before {
@@ -108,16 +123,17 @@
             left: -50%;
             right: -50%;
             bottom: -50%;
+            /* KEEP THE RADIAL GRADIENTS BUT MAKE THEM MORE VISIBLE */
             background: 
-                radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.05) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(118, 75, 162, 0.05) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(240, 147, 251, 0.03) 0%, transparent 50%),
-                radial-gradient(circle at 60% 60%, rgba(245, 87, 108, 0.03) 0%, transparent 50%),
-                radial-gradient(circle at 30% 70%, rgba(56, 189, 248, 0.03) 0%, transparent 50%),
-                radial-gradient(circle at 70% 30%, rgba(251, 146, 60, 0.03) 0%, transparent 50%),
-                radial-gradient(circle at 10% 90%, rgba(56, 189, 248, 0.02) 0%, transparent 50%),
-                radial-gradient(circle at 90% 10%, rgba(251, 146, 60, 0.02) 0%, transparent 50%);
-            animation: float 30s infinite linear;
+                radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(118, 75, 162, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(240, 147, 251, 0.12) 0%, transparent 50%),
+                radial-gradient(circle at 60% 60%, rgba(245, 87, 108, 0.12) 0%, transparent 50%),
+                radial-gradient(circle at 30% 70%, rgba(56, 189, 248, 0.12) 0%, transparent 50%),
+                radial-gradient(circle at 70% 30%, rgba(251, 146, 60, 0.12) 0%, transparent 50%),
+                radial-gradient(circle at 10% 90%, rgba(56, 189, 248, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 90% 10%, rgba(251, 146, 60, 0.1) 0%, transparent 50%);
+            animation: float 25s infinite linear;
         }
         
         /* Ensure content is above background */
@@ -164,6 +180,10 @@
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
+}
+@keyframes float {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
         .login-background {
