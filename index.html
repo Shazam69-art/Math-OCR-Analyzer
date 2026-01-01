@@ -1537,17 +1537,14 @@
         console.log('Checking auth...');
         const response = await fetch(`${BACKEND_URL}/api/check-auth`, {
             method: 'GET',
-            credentials: 'include',  // This sends cookies
-            headers: {
-                'Accept': 'application/json',
-                // REMOVE Cache-Control and Pragma headers
-            }
+            credentials: 'include'
         });
         
         console.log('Auth check status:', response.status);
+        console.log('Auth check URL:', `${BACKEND_URL}/api/check-auth`);
         
         if (response.status === 401) {
-            showLoginPage();
+            console.log('Not authenticated (401)');
             return false;
         }
         
@@ -1557,59 +1554,63 @@
         if (data.authenticated && data.user) {
             currentUser = data.user;
             localStorage.setItem('user', JSON.stringify(data.user));
-            showDashboard(data.user);
+            // DO NOT call showDashboard here! It should only update UI
+            document.getElementById('userName').textContent = data.user.username;
+            console.log('User authenticated:', data.user.username);
             return true;
         } else {
-            showLoginPage();
+            console.log('Not authenticated (no user data)');
+            currentUser = null;
             localStorage.removeItem('user');
             return false;
         }
     } catch (error) {
         console.error('Auth check failed:', error);
-        showLoginPage();
+        currentUser = null;
+        localStorage.removeItem('user');
         return false;
     }
 }
         async function loginUser(username, password) {
-            try {
-                const errorMessage = document.getElementById('loginErrorMessage');
-                const successMessage = document.getElementById('loginSuccessMessage');
-                
-                errorMessage.classList.remove('show');
+    try {
+        const errorMessage = document.getElementById('loginErrorMessage');
+        const successMessage = document.getElementById('loginSuccessMessage');
+        
+        errorMessage.classList.remove('show');
+        successMessage.classList.remove('show');
+        
+        const response = await fetch(`${BACKEND_URL}/api/login`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username, password}),
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            successMessage.textContent = data.message;
+            successMessage.classList.add('show');
+            
+            // Store user info
+            currentUser = data.user;
+            localStorage.setItem('user', JSON.stringify(data.user));
+            
+            // Show dashboard after brief delay
+            setTimeout(() => {
+                showDashboard(data.user);  // <-- THIS IS CRITICAL
                 successMessage.classList.remove('show');
-                
-                const response = await fetch(`${BACKEND_URL}/api/login`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username, password}),
-                    credentials: 'include'
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    successMessage.textContent = data.message;
-                    successMessage.classList.add('show');
-                    
-                    // Store user info
-                    currentUser = data.user;
-                    localStorage.setItem('user', JSON.stringify(data.user));
-                    
-                    // Show dashboard after brief delay
-                    setTimeout(() => {
-                        showDashboard(data.user);
-                        successMessage.classList.remove('show');
-                    }, 1000);
-                } else {
-                    errorMessage.textContent = data.message;
-                    errorMessage.classList.add('show');
-                }
-            } catch (error) {
-                const errorMessage = document.getElementById('loginErrorMessage');
-                errorMessage.textContent = 'Connection error. Please try again.';
-                errorMessage.classList.add('show');
-            }
+            }, 1000);
+        } else {
+            errorMessage.textContent = data.message;
+            errorMessage.classList.add('show');
         }
+    } catch (error) {
+        const errorMessage = document.getElementById('loginErrorMessage');
+        errorMessage.textContent = 'Connection error. Please try again.';
+        errorMessage.classList.add('show');
+    }
+}
 
         async function registerUser(username, phone, password) {
             try {
@@ -1823,13 +1824,18 @@
         async function startAnalysis() {
     if (isAnalyzing) return;
     
-    // Check authentication BEFORE file upload
+    console.log('=== Starting analysis check ===');
+    
+    // Check authentication
     const isAuthenticated = await checkAuth();
+    console.log('Is authenticated after check:', isAuthenticated);
+    
     if (!isAuthenticated) {
         alert('Please login to start analysis');
-        showLoginPage();
+        showLoginPage();  // Only call this once
         return;
     }
+}
     
     if (questionFiles.length === 0 || answerFiles.length === 0) {
         alert('Please upload both question papers and answer sheets');
