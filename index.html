@@ -1537,11 +1537,20 @@
         console.log('Checking auth...');
         const response = await fetch(`${BACKEND_URL}/api/check-auth`, {
             method: 'GET',
-            credentials: 'include'
-            // REMOVE the Cache-Control and Pragma headers
+            credentials: 'include',  // This sends cookies
+            headers: {
+                'Accept': 'application/json',
+                // REMOVE Cache-Control and Pragma headers
+            }
         });
         
         console.log('Auth check status:', response.status);
+        
+        if (response.status === 401) {
+            showLoginPage();
+            return false;
+        }
+        
         const data = await response.json();
         console.log('Auth check data:', data);
         
@@ -1864,11 +1873,10 @@
     try {
         console.log('Sending analysis request...');
         
-        // CRITICAL FIX: Add credentials: 'include' to send cookies
         const response = await fetch(`${BACKEND_URL}/analyze`, {
             method: 'POST',
             body: formData,
-            credentials: 'include',  // THIS IS CRITICAL - sends cookies
+            credentials: 'include',  // This sends cookies
             // No Content-Type header for FormData - let browser set it
         });
         
@@ -1880,7 +1888,16 @@
             currentUser = null;
             showLoginPage();
             alert('Session expired. Please login again.');
+            removeLoadingOverlay();
+            isAnalyzing = false;
+            btn.innerHTML = `<svg style="width: 1.25rem; height: 1.25rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Start Analysis`;
+            btn.disabled = false;
             return;
+        }
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Server error: ${response.status} - ${errorText}`);
         }
         
         const data = await response.json();
@@ -1915,7 +1932,7 @@
     } finally {
         isAnalyzing = false;
         btn.innerHTML = `<svg style="width: 1.25rem; height: 1.25rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Start Analysis`;
-        btn.disabled = false;
+        btn.disabled = (questionFiles.length === 0 || answerFiles.length === 0);
     }
 }
 
