@@ -3,118 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Math.AI - Google Login Test</title>
+    <title>Simple Auth Test</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f7fa;
-            color: #1a1a2e;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 400px;
-            width: 100%;
-        }
-        .logo {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-        .logo span { color: #4361ee; }
-        .subtitle { color: #6c757d; margin-bottom: 32px; }
-        button {
-            width: 100%;
-            padding: 14px;
-            background: white;
-            border: 2px solid #dee2e6;
-            color: #4285F4;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
-        button:hover { opacity: 0.9; }
-        .message {
-            margin-top: 20px;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: 500;
-        }
-        .success { background: rgba(16,185,129,0.1); color: #10b981; }
-        .error { background: rgba(230,57,70,0.1); color: #e63946; }
+        body { font-family: Arial, sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 50px; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 400px; }
+        h2 { text-align: center; color: #4361ee; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; }
+        button { width: 100%; padding: 12px; background: #4361ee; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+        button:hover { background: #3650d1; }
+        .msg { padding: 10px; margin-top: 15px; border-radius: 6px; text-align: center; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        a { color: #4361ee; text-decoration: none; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="logo">CAS <span>Educations</span></div>
-        <p class="subtitle">AI-Powered Math Analysis Platform</p>
-        <p>Google Login Test - Only Google authentication</p>
+    <div class="card">
+        <h2>Simple Auth Test</h2>
 
-        <button onclick="handleGoogleLogin()">
-            <svg width="20" height="20" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Continue with Google
-        </button>
+        <div id="registerForm">
+            <h3>Register</h3>
+            <input type="text" id="regUsername" placeholder="Username">
+            <input type="password" id="regPassword" placeholder="Password">
+            <input type="password" id="regConfirm" placeholder="Confirm Password">
+            <button onclick="register()">Register</button>
+            <p style="text-align:center; margin-top:15px;">
+                Already have account? <a href="#" onclick="showLogin()">Login</a>
+            </p>
+        </div>
 
-        <div id="message" class="message" style="display:none;"></div>
-        <div id="userInfo" style="margin-top:20px;"></div>
+        <div id="loginForm" style="display:none;">
+            <h3>Login</h3>
+            <input type="text" id="loginUsername" placeholder="Username">
+            <input type="password" id="loginPassword" placeholder="Password">
+            <button onclick="login()">Login</button>
+            <p style="text-align:center; margin-top:15px;">
+                No account? <a href="#" onclick="showRegister()">Register</a>
+            </p>
+        </div>
+
+        <div id="status" class="msg" style="display:none;"></div>
+        <div id="user" style="margin-top:20px; text-align:center;"></div>
     </div>
 
     <script>
-        const BASE_URL = 'https://navalsheth.pythonanywhere.com';
+        const API = 'https://navalsheth.pythonanywhere.com';
 
-        function showMessage(text, isError = false) {
-            const msg = document.getElementById('message');
-            msg.textContent = text;
-            msg.className = 'message ' + (isError ? 'error' : 'success');
-            msg.style.display = 'block';
+        function show(msg, success = true) {
+            const el = document.getElementById('status');
+            el.textContent = msg;
+            el.className = 'msg ' + (success ? 'success' : 'error');
+            el.style.display = 'block';
         }
 
-        function handleGoogleLogin() {
-            window.location.href = `${BASE_URL}/api/auth/google`;
-        }
+        async function register() {
+            const u = document.getElementById('regUsername').value.trim();
+            const p = document.getElementById('regPassword').value;
+            const c = document.getElementById('regConfirm').value;
 
-        // Check if redirected back with success/error
-        const params = new URLSearchParams(window.location.search);
-        if (params.has('google_auth')) {
-            if (params.get('google_auth') === 'success') {
-                showMessage('Google login successful! 🎉');
-                document.getElementById('userInfo').innerHTML = '<p>You are logged in. In the full app, dashboard would load here.</p>';
-            } else {
-                showMessage('Google login failed: ' + params.get('message'), true);
+            if (!u || !p || !c) return show('Fill all fields', false);
+            if (p !== c) return show('Passwords do not match', false);
+
+            try {
+                const res = await fetch(`${API}/api/register`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: u, password: p, confirm: c})
+                });
+                const data = await res.json();
+                show(data.message, data.success);
+                if (data.success) checkAuth();
+            } catch (e) {
+                show('Network error', false);
             }
         }
 
-        // Optional: Check auth status on load
+        async function login() {
+            const u = document.getElementById('loginUsername').value.trim();
+            const p = document.getElementById('loginPassword').value;
+
+            try {
+                const res = await fetch(`${API}/api/login`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: u, password: p})
+                });
+                const data = await res.json();
+                show(data.message, data.success);
+                if (data.success) checkAuth();
+            } catch (e) {
+                show('Network error', false);
+            }
+        }
+
         async function checkAuth() {
             try {
-                const res = await fetch(`${BASE_URL}/api/check_auth`, { credentials: 'include' });
+                const res = await fetch(`${API}/api/check_auth`, { credentials: 'include' });
                 const data = await res.json();
                 if (data.authenticated) {
-                    showMessage('You are already logged in as ' + data.user.username);
+                    document.getElementById('user').innerHTML = `<strong>Logged in as: ${data.username}</strong>`;
+                } else {
+                    document.getElementById('user').innerHTML = '';
                 }
-            } catch (e) {
-                console.log('Not logged in');
-            }
+            } catch (e) {}
         }
-        checkAuth();
+
+        function showLogin() {
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('loginForm').style.display = 'block';
+        }
+
+        function showRegister() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'block';
+        }
+
+        checkAuth(); // on load
     </script>
 </body>
 </html>
