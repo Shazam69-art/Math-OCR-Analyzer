@@ -1538,79 +1538,69 @@
         const response = await fetch(`${BACKEND_URL}/api/check-auth`, {
             method: 'GET',
             credentials: 'include'
+            // REMOVE the Cache-Control and Pragma headers
         });
         
         console.log('Auth check status:', response.status);
-        console.log('Auth check URL:', `${BACKEND_URL}/api/check-auth`);
-        
-        if (response.status === 401) {
-            console.log('Not authenticated (401)');
-            return false;
-        }
-        
         const data = await response.json();
         console.log('Auth check data:', data);
         
         if (data.authenticated && data.user) {
             currentUser = data.user;
             localStorage.setItem('user', JSON.stringify(data.user));
-            // DO NOT call showDashboard here! It should only update UI
-            document.getElementById('userName').textContent = data.user.username;
-            console.log('User authenticated:', data.user.username);
+            showDashboard(data.user);
             return true;
         } else {
-            console.log('Not authenticated (no user data)');
-            currentUser = null;
+            showLoginPage();
             localStorage.removeItem('user');
             return false;
         }
     } catch (error) {
         console.error('Auth check failed:', error);
-        currentUser = null;
-        localStorage.removeItem('user');
+        showLoginPage();
         return false;
     }
 }
         async function loginUser(username, password) {
-    try {
-        const errorMessage = document.getElementById('loginErrorMessage');
-        const successMessage = document.getElementById('loginSuccessMessage');
-        
-        errorMessage.classList.remove('show');
-        successMessage.classList.remove('show');
-        
-        const response = await fetch(`${BACKEND_URL}/api/login`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({username, password}),
-            credentials: 'include'
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            successMessage.textContent = data.message;
-            successMessage.classList.add('show');
-            
-            // Store user info
-            currentUser = data.user;
-            localStorage.setItem('user', JSON.stringify(data.user));
-            
-            // Show dashboard after brief delay
-            setTimeout(() => {
-                showDashboard(data.user);  // <-- THIS IS CRITICAL
+            try {
+                const errorMessage = document.getElementById('loginErrorMessage');
+                const successMessage = document.getElementById('loginSuccessMessage');
+                
+                errorMessage.classList.remove('show');
                 successMessage.classList.remove('show');
-            }, 1000);
-        } else {
-            errorMessage.textContent = data.message;
-            errorMessage.classList.add('show');
+                
+                const response = await fetch(`${BACKEND_URL}/api/login`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password}),
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    successMessage.textContent = data.message;
+                    successMessage.classList.add('show');
+                    
+                    // Store user info
+                    currentUser = data.user;
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    // Show dashboard after brief delay
+                    setTimeout(() => {
+                        showDashboard(data.user);
+                        successMessage.classList.remove('show');
+                    }, 1000);
+                } else {
+                    errorMessage.textContent = data.message;
+                    errorMessage.classList.add('show');
+                }
+            } catch (error) {
+                const errorMessage = document.getElementById('loginErrorMessage');
+                errorMessage.textContent = 'Connection error. Please try again.';
+                errorMessage.classList.add('show');
+            }
         }
-    } catch (error) {
-        const errorMessage = document.getElementById('loginErrorMessage');
-        errorMessage.textContent = 'Connection error. Please try again.';
-        errorMessage.classList.add('show');
-    }
-}
 
         async function registerUser(username, phone, password) {
             try {
@@ -1823,24 +1813,20 @@
         // Analysis functions
         async function startAnalysis() {
     if (isAnalyzing) return;
-   
-    console.log('=== Starting analysis check ===');
-   
-    // Check authentication
+    
+    // Check authentication BEFORE file upload
     const isAuthenticated = await checkAuth();
-    console.log('Is authenticated after check:', isAuthenticated);
-   
     if (!isAuthenticated) {
         alert('Please login to start analysis');
         showLoginPage();
         return;
     }
-   
+    
     if (questionFiles.length === 0 || answerFiles.length === 0) {
         alert('Please upload both question papers and answer sheets');
         return;
     }
-   
+    
     isAnalyzing = true;
     const btn = document.getElementById('startAnalysisBtn');
     
@@ -1878,10 +1864,11 @@
     try {
         console.log('Sending analysis request...');
         
+        // CRITICAL FIX: Add credentials: 'include' to send cookies
         const response = await fetch(`${BACKEND_URL}/analyze`, {
             method: 'POST',
             body: formData,
-            credentials: 'include',  // This sends cookies
+            credentials: 'include',  // THIS IS CRITICAL - sends cookies
             // No Content-Type header for FormData - let browser set it
         });
         
@@ -1893,16 +1880,7 @@
             currentUser = null;
             showLoginPage();
             alert('Session expired. Please login again.');
-            removeLoadingOverlay();
-            isAnalyzing = false;
-            btn.innerHTML = `<svg style="width: 1.25rem; height: 1.25rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Start Analysis`;
-            btn.disabled = false;
             return;
-        }
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Server error: ${response.status} - ${errorText}`);
         }
         
         const data = await response.json();
@@ -1937,7 +1915,7 @@
     } finally {
         isAnalyzing = false;
         btn.innerHTML = `<svg style="width: 1.25rem; height: 1.25rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Start Analysis`;
-        btn.disabled = (questionFiles.length === 0 || answerFiles.length === 0);
+        btn.disabled = false;
     }
 }
 
