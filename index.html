@@ -1823,25 +1823,24 @@
         // Analysis functions
         async function startAnalysis() {
     if (isAnalyzing) return;
-    
+   
     console.log('=== Starting analysis check ===');
-    
+   
     // Check authentication
     const isAuthenticated = await checkAuth();
     console.log('Is authenticated after check:', isAuthenticated);
-    
+   
     if (!isAuthenticated) {
         alert('Please login to start analysis');
-        showLoginPage();  // Only call this once
+        showLoginPage();
         return;
     }
-}
-    
+   
     if (questionFiles.length === 0 || answerFiles.length === 0) {
         alert('Please upload both question papers and answer sheets');
         return;
     }
-    
+   
     isAnalyzing = true;
     const btn = document.getElementById('startAnalysisBtn');
     
