@@ -2044,45 +2044,67 @@ function removeLoadingOverlay() {
             await MathJax.typesetPromise([practicePaper]);
         }
         
-        // Additional wait to ensure rendering is complete
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait for rendering to stabilize
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
-        // Remove ALL MathJax script tags that cause double rendering
-        const mjxScripts = practicePaper.querySelectorAll('script[type*="math"]');
-        const originalScripts = [];
-        mjxScripts.forEach(script => {
-            originalScripts.push({
-                element: script,
-                parent: script.parentNode,
-                nextSibling: script.nextSibling
-            });
-            script.remove();
+        // Create a clean clone for PDF generation
+        const clone = practicePaper.cloneNode(true);
+        
+        // CRITICAL: Remove ALL sources of duplication
+        // 1. Remove original LaTeX script tags
+        clone.querySelectorAll('script[type*="math"]').forEach(el => el.remove());
+        
+        // 2. Remove MathJax preview/processing elements
+        clone.querySelectorAll('.MathJax_Preview, .MathJax_Processing, .MathJax_Display').forEach(el => el.remove());
+        
+        // 3. Keep ONLY the final rendered output (mjx-container)
+        // Remove any nested duplicates within mjx-containers
+        clone.querySelectorAll('mjx-container mjx-container').forEach(el => el.remove());
+        
+        // 4. If you're seeing raw LaTeX text, remove it
+        const textNodes = [];
+        const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
+        let node;
+        while (node = walker.nextNode()) {
+            // Remove text nodes that contain raw LaTeX (starting with $ or $$)
+            if (node.textContent.trim().match(/^\$+/)) {
+                textNodes.push(node);
+            }
+        }
+        textNodes.forEach(node => {
+            // Only remove if there's a rendered version nearby
+            const parent = node.parentElement;
+            if (parent && parent.querySelector('mjx-container')) {
+                node.remove();
+            }
         });
         
-        // Generate canvas with only the rendered MathJax output
-        const canvas = await html2canvas(practicePaper, {
+        // Temporarily add clone to document (required for html2canvas)
+        clone.style.position = 'absolute';
+        clone.style.left = '-9999px';
+        clone.style.top = '0';
+        clone.style.width = '1200px';
+        clone.style.background = '#ffffff';
+        document.body.appendChild(clone);
+        
+        // Generate canvas from clean clone
+        const canvas = await html2canvas(clone, {
             scale: 2,
             useCORS: true,
             backgroundColor: '#ffffff',
             logging: false,
-            windowWidth: 1200,
-            windowHeight: practicePaper.scrollHeight + 100,
+            width: 1200,
+            height: clone.scrollHeight,
             ignoreElements: (element) => {
-                // Ignore specific MathJax processing elements
-                return element.classList.contains('MathJax_Processing') ||
+                // Double-check: ignore any remaining script or preview elements
+                return element.tagName === 'SCRIPT' ||
                        element.classList.contains('MathJax_Preview') ||
-                       element.tagName === 'SCRIPT';
+                       element.classList.contains('MathJax_Processing');
             }
         });
         
-        // Restore the original scripts
-        originalScripts.forEach(({element, parent, nextSibling}) => {
-            if (nextSibling) {
-                parent.insertBefore(element, nextSibling);
-            } else {
-                parent.appendChild(element);
-            }
-        });
+        // Remove clone
+        document.body.removeChild(clone);
         
         // Create PDF
         const { jsPDF } = window.jspdf;
@@ -2090,17 +2112,15 @@ function removeLoadingOverlay() {
         const imgData = canvas.toDataURL('image/png');
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgWidth = pdfWidth - 20; // 10mm margins on each side
+        const imgWidth = pdfWidth - 20;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
         
         let heightLeft = imgHeight;
-        let position = 10; // Top margin
+        let position = 10;
         
-        // Add first page
         pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
         heightLeft -= (pdfHeight - 20);
         
-        // Add additional pages if content is longer than one page
         while (heightLeft > 0) {
             position = heightLeft - imgHeight + 10;
             pdf.addPage();
