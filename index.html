@@ -1537,14 +1537,22 @@
         console.log('Checking auth...');
         const response = await fetch(`${BACKEND_URL}/api/check-auth`, {
             method: 'GET',
-            credentials: 'include',
-            cache: 'no-cache'
+            credentials: 'include',  // Important for sending cookies
+            headers: {
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache'
+            }
         });
         
         console.log('Auth check status:', response.status);
+        console.log('Auth headers:', response.headers.get('Access-Control-Allow-Origin'));
         
         if (!response.ok) {
-            throw new Error('Auth check failed');
+            // Don't throw error for 401 - just return false
+            if (response.status === 401) {
+                return false;
+            }
+            throw new Error(`Auth check failed with status: ${response.status}`);
         }
         
         const data = await response.json();
