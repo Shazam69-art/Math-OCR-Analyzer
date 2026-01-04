@@ -2342,33 +2342,61 @@
             }
         }
         function populateSidebar(analysesList) {
-            const html = analysesList.map(a => `
-                <div class="sidebar-item ${a.id === currentAnalysisId ? 'active' : ''}" id="sidebar-item-${a.id}">
-                    <div class="sidebar-item-title" id="title-${a.id}" onclick="loadAnalysis(${a.id})">${a.analysis_name}</div>
-                    <div class="sidebar-item-date">${a.formatted_date}</div>
-                    <div class="sidebar-item-preview">${a.preview}</div>
-                    <div class="sidebar-actions">
-                        <button onclick="startEditName(${a.id}, event)">Edit</button>
-                        <button onclick="deleteAnalysis(${a.id}, event)">Delete</button>
-                    </div>
-                </div>
-            `).join('');
-            document.getElementById('historyList').innerHTML = html;
-        }
+    const html = analysesList.map(a => `
+        <div class="sidebar-item ${a.id === currentAnalysisId ? 'active' : ''}" id="sidebar-item-${a.id}">
+            <div class="sidebar-item-title" id="title-${a.id}" onclick="loadAnalysis(${a.id})">${a.analysis_name}</div>
+            <div class="sidebar-item-date">${a.formatted_date}</div>
+            <div class="sidebar-item-preview" id="preview-${a.id}"></div>
+            <div class="sidebar-actions">
+                <button onclick="startEditName(${a.id}, event)">Edit</button>
+                <button onclick="deleteAnalysis(${a.id}, event)">Delete</button>
+            </div>
+        </div>
+    `).join('');
+    document.getElementById('historyList').innerHTML = html;
+    
+    // Process MathJax for each preview
+    setTimeout(() => {
+        analysesList.forEach(a => {
+            const previewEl = document.getElementById(`preview-${a.id}`);
+            if (previewEl) {
+                // Set the preview text with proper escaping
+                previewEl.textContent = a.preview;
+                // Tell MathJax to process this element
+                if (window.MathJax) {
+                    MathJax.typesetPromise([previewEl]).catch(err => console.error('MathJax error:', err));
+                }
+            }
+        });
+    }, 100);
+}
         function populateMobileSidebar(analysesList) {
-            const html = analysesList.map(a => `
-                <div class="sidebar-item ${a.id === currentAnalysisId ? 'active' : ''}" id="mobile-sidebar-item-${a.id}">
-                    <div class="sidebar-item-title" id="mobile-title-${a.id}" onclick="loadAnalysis(${a.id}); closeMobileMenu();">${a.analysis_name}</div>
-                    <div class="sidebar-item-date">${a.formatted_date}</div>
-                    <div class="sidebar-item-preview">${a.preview}</div>
-                    <div class="sidebar-actions">
-                        <button onclick="startEditName(${a.id}, event)">Edit</button>
-                        <button onclick="deleteAnalysis(${a.id}, event)">Delete</button>
-                    </div>
-                </div>
-            `).join('');
-            document.getElementById('mobileHistoryList').innerHTML = html;
-        }
+    const html = analysesList.map(a => `
+        <div class="sidebar-item ${a.id === currentAnalysisId ? 'active' : ''}" id="mobile-sidebar-item-${a.id}">
+            <div class="sidebar-item-title" id="mobile-title-${a.id}" onclick="loadAnalysis(${a.id}); closeMobileMenu();">${a.analysis_name}</div>
+            <div class="sidebar-item-date">${a.formatted_date}</div>
+            <div class="sidebar-item-preview" id="mobile-preview-${a.id}"></div>
+            <div class="sidebar-actions">
+                <button onclick="startEditName(${a.id}, event)">Edit</button>
+                <button onclick="deleteAnalysis(${a.id}, event)">Delete</button>
+            </div>
+        </div>
+    `).join('');
+    document.getElementById('mobileHistoryList').innerHTML = html;
+    
+    // Process MathJax for mobile previews too
+    setTimeout(() => {
+        analysesList.forEach(a => {
+            const previewEl = document.getElementById(`mobile-preview-${a.id}`);
+            if (previewEl) {
+                previewEl.textContent = a.preview;
+                if (window.MathJax) {
+                    MathJax.typesetPromise([previewEl]).catch(err => console.error('MathJax error:', err));
+                }
+            }
+        });
+    }, 100);
+}
         function startEditName(id, event) {
             event.stopPropagation();
             const titleEl = document.getElementById(`title-${id}`);
